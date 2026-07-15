@@ -1,0 +1,36 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Date: Wed, 15 Jul 2026 12:36:22 +0000
+MD5Sum:
+ b9dc76c6e2fd8ab4a175a4e0d3426de0              681 Packages
+ dc9c1672efdc19086321ce05cdcc3d46              486 Packages.gz
+ cbcd7f956e6eed4355e7da755c00f2e5               38 Release
+SHA1:
+ 4086bb8cb88a0998e522b5c5c99d594e2c825ca7              681 Packages
+ 15406d5ccd478fceb44fd6b583be33fcee8fdedb              486 Packages.gz
+ 06d25493ed87811ff19cfd5f8764696342a1d643               38 Release
+SHA256:
+ 909ff322bfdd6e1a90dff0b7aa3fa5d06cd53fa60fe06579756fdc89394c4e66              681 Packages
+ e59a4f62a54421e6dcf5044169b4d4cb2ee1f75105acb9f4d5159d44516f25f8              486 Packages.gz
+ 62434ce82466a48934e3fde6258b015e33a7847758b7d16ddb067e9c81a41e92               38 Release
+SHA512:
+ 30e8e959a15a39ec0cea8db0cb68e249a5133b22ebd0520f8e0e4845b05d1522512ce0f010fcfd70b20e3e62ae8a52970a78da6c03dcd2dd3a7927787de77906              681 Packages
+ 473d3d35817f29b08212f9b966bc12e671eab4b1f314231bd9c725d98a920170e57bfc9bad927d773f2867dd172dd9e7c387fdc756d011651b3436ab81f0900c              486 Packages.gz
+ 77b5d2bd31f964962d61bcee9b2f04fbcbc476aa0f52061e5baabd60eea9b22ddeef520b92a02bfa9fed8e9e37cb9a8c547523a4fd33b72122c7d1b4f7d610bf               38 Release
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEEF/2pXD5wQfEkRLsWC9MbbZ6fYqgFAmpXfsYACgkQC9MbbZ6f
+YqgPUA//bvJDGZw4JSb5TEV4D8enLWiHZnlvS9KuR25Vmw90JxHvDX2LLzhaZ9Zf
+2pBFLEjEP+wOembWsfgH70L50y9TBby5Af0LtocMTcnITo/6JlvytSbM119F22GR
+yvprxvEqTa8DhTnFKs0HWxvqUu21XJrp3gs2IybthRP8/ZI1v6E5p33lfcdLPNnw
+AE7i35s3biXX/4bX2ybY/aKvDTnNrH4T+ZAT4Sb6Qm05XgSmyOs9Oxlo8n00rYf5
+acPO4d5wcHSG3s4243YOBaeW0OAi+2IrebnBqR/5RaeW7i9Unn4+lE4j5wNbZ5zu
+wg5PqchfgnHi4rutJ+m7isu4osDdsFwvDWwHkexorLgIHbAeZTyhcDeU+RM1nsxO
+JXHDtWnzWfLJ52XYnf0NJMrPKZhFBE1QRGSMjaVrLkVabZ686U78PEKajuSpI8V8
+QKPTP6ne7gcRWTgeAdBE25zjwyx9FKOK+PavFp3kQJjAmgX94i8yq+nXPhZLumIs
+hmO001oxkoiYx5CsZoBkaDpbEy7GMLeuz7aDZhM2maH/IS281WQ+0TtS31kRMuha
+ai3DZlGd1NwbGCgBzRFa5VLqxsrDJ6jNaoDXiezTgkEifOnLYp91rgqaTj9jHkVG
+Qzbwjl+Qhvl+D3a/ktlAPbbqXSt9A3c4iLcs8/CFVQDr05OtfYk=
+=73Qp
+-----END PGP SIGNATURE-----
