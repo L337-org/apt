@@ -1,0 +1,159 @@
+name: Aggregate APT repo
+
+# Single-writer, pull-based aggregator: downloads .deb release assets from the
+# org repos listed in repos.yaml (public releases - no cross-repo credentials),
+# regenerates and signs the flat-repo index, and pushes to this repo's own
+# gh-pages branch, served at https://apt.l337.org/. Producing projects never
+# push here; they just publish GitHub Releases with a .deb asset.
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aggregate
+  cancel-in-progress: false
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    env:
+      APT_GNUPGHOME: /tmp/gnupg-apt
+      COMMIT_SIGNING_GNUPGHOME: /tmp/gnupg-commit
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out main (config + templates)
+        uses: actions/checkout@v7
+        with:
+          path: main
+
+      - name: Check out gh-pages (the published repo)
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          path: gh-pages
+          fetch-depth: 0
+
+      - name: Install apt repo tooling
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev gnupg
+
+      - name: Sync .deb files from source repos' GitHub Releases
+        run: |
+          python3 - <<'EOF'
+          import json, os, subprocess, sys, urllib.request
+
+          try:
+              import yaml
+              with open("main/repos.yaml") as f:
+                  config = yaml.safe_load(f)
+          except ImportError:
+              sys.exit("PyYAML missing on runner - install python3-yaml in this step")
+
+          wanted = {}  # filename -> download url
+          for entry in config["repos"]:
+              repo = entry["repo"]
+              keep = int(entry.get("keep_last_n", 5))
+              releases = json.loads(subprocess.check_output(
+                  ["gh", "api", f"repos/{repo}/releases?per_page=100"]))
+              with_debs = 0
+              for rel in releases:  # newest first
+                  debs = [a for a in rel["assets"] if a["name"].endswith(".deb")]
+                  if not debs:
+                      continue
+                  for a in debs:
+                      wanted[a["name"]] = a["browser_download_url"]
+                  with_debs += 1
+                  if with_debs >= keep:
+                      break
+              print(f"{repo}: {with_debs} releases with .deb assets selected")
+
+          have = {f for f in os.listdir("gh-pages") if f.endswith(".deb")}
+          for name in sorted(have - set(wanted)):
+              print(f"prune: {name}")
+              os.remove(os.path.join("gh-pages", name))
+          for name, url in sorted(wanted.items()):
+              if name not in have:
+                  print(f"fetch: {name}")
+                  urllib.request.urlretrieve(url, os.path.join("gh-pages", name))
+          EOF
+
+      - name: Copy in templates (CNAME, keyrings, index.html, README)
+        run: cp -a main/templates/. gh-pages/
+
+      - name: Detect changes
+        id: detect
+        working-directory: gh-pages
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No .deb or template changes - skipping index regeneration and commit."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git status --short
+          fi
+
+      - name: Import APT signing key
+        if: steps.detect.outputs.changed == 'true'
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APT_GPG_PRIVATE_KEY" ]; then
+            echo "::error::APT_GPG_PRIVATE_KEY secret is not set." >&2
+            exit 1
+          fi
+          mkdir -m 700 "$APT_GNUPGHOME"
+          printf '%s' "$APT_GPG_PRIVATE_KEY" | base64 -d | GNUPGHOME="$APT_GNUPGHOME" gpg --batch --import
+
+      - name: Regenerate and sign the index
+        if: steps.detect.outputs.changed == 'true'
+        working-directory: gh-pages
+        env:
+          GNUPGHOME: ${{ env.APT_GNUPGHOME }}
+        run: |
+          dpkg-scanpackages . /dev/null > Packages
+          gzip -9c Packages > Packages.gz
+          apt-ftparchive release . > Release
+          gpg --batch --yes -abs -o Release.gpg Release
+          gpg --batch --yes --clearsign -o InRelease Release
+
+      - name: Import commit-signing key
+        if: steps.detect.outputs.changed == 'true'
+        env:
+          CI_COMMIT_SIGNING_KEY: ${{ secrets.CI_COMMIT_SIGNING_KEY }}
+        run: |
+          if [ -z "$CI_COMMIT_SIGNING_KEY" ]; then
+            echo "::error::CI_COMMIT_SIGNING_KEY secret is not set - required by the" \
+                 "gh-pages ruleset's signed-commits rule." >&2
+            exit 1
+          fi
+          mkdir -m 700 "$COMMIT_SIGNING_GNUPGHOME"
+          printf '%s' "$CI_COMMIT_SIGNING_KEY" | base64 -d | GNUPGHOME="$COMMIT_SIGNING_GNUPGHOME" gpg --batch --import
+
+      - name: Commit and push
+        if: steps.detect.outputs.changed == 'true'
+        working-directory: gh-pages
+        env:
+          # git invokes gpg to sign the commit - point it at the isolated keyring
+          # so it can only ever use the commit-signing key, never the APT key.
+          GNUPGHOME: ${{ env.COMMIT_SIGNING_GNUPGHOME }}
+          COMMIT_SIGNING_EMAIL: ${{ vars.COMMIT_SIGNING_EMAIL }}
+          COMMIT_SIGNING_KEY_FINGERPRINT: ${{ vars.COMMIT_SIGNING_KEY_FINGERPRINT }}
+        run: |
+          if [ -z "$COMMIT_SIGNING_EMAIL" ] || [ -z "$COMMIT_SIGNING_KEY_FINGERPRINT" ]; then
+            echo "::error::COMMIT_SIGNING_EMAIL and/or COMMIT_SIGNING_KEY_FINGERPRINT repo" \
+                 "variable is not set." >&2
+            exit 1
+          fi
+          # GitHub's "verified signature" check requires the commit email to match a
+          # verified email on the account the signing key is registered to.
+          git config user.name "github-actions[bot]"
+          git config user.email "$COMMIT_SIGNING_EMAIL"
+          git config user.signingkey "$COMMIT_SIGNING_KEY_FINGERPRINT"
+          git config commit.gpgsign true
+          git add -A
+          git commit -m "Aggregate APT repo contents"
+          git push origin gh-pages

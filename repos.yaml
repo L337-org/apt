@@ -1,0 +1,6 @@
+# Projects whose GitHub Releases feed the APT repo. The aggregator takes the
+# newest keep_last_n releases that carry a .deb asset from each; older versions
+# remain available on each project's Releases page.
+repos:
+  - repo: L337-org/send-to-influx
+    keep_last_n: 5

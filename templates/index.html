@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>L337 APT repository</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+  code, pre { background: #f0f0f0; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { padding: 0.75em 1em; overflow-x: auto; }
+  a { color: #0645ad; }
+</style>
+</head>
+<body>
+<h1>L337 APT repository</h1>
+<p>
+  This is a flat APT repository for <a href="https://github.com/L337-org">L337-org</a> projects,
+  refreshed automatically from each project's GitHub Releases. It is not meant to be browsed -
+  install via <code>apt</code>:
+</p>
+<pre>curl -fsSL https://apt.l337.org/l337-apt.gpg | sudo tee /usr/share/keyrings/l337-apt.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/l337-apt.gpg] https://apt.l337.org/ ./" | sudo tee /etc/apt/sources.list.d/l337-apt.list
+sudo apt update</pre>
+<p>Packages currently published here:</p>
+<ul>
+  <li><a href="https://github.com/L337-org/send-to-influx">send-to-influx</a> - see its
+      <a href="https://github.com/L337-org/send-to-influx#readme">README</a> for setup and its
+      <a href="https://github.com/L337-org/send-to-influx/releases">Releases page</a> for notes
+      and direct <code>.deb</code> downloads.</li>
+</ul>
+<p>
+  This repository is managed by
+  <a href="https://github.com/L337-org/apt">L337-org/apt</a> - contents are regenerated
+  automatically, don't edit by hand. (<code>send-to-influx.gpg</code> is the same signing key as
+  <code>l337-apt.gpg</code> under its historical name.)
+</p>
+</body>
+</html>
