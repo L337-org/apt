@@ -1,17 +1,22 @@
 Package: send-to-influx
-Version: 4.3
+Version: 4.4
 Architecture: all
 Maintainer: Gavin Lucas
 Depends: debconf (>= 0.5), python3 (>= 3.10), python3 (<< 3.31)
-Filename: ./send-to-influx_4.3_all.deb
-Size: 2994538
-MD5sum: 0052d94737bfb6a97540d11bbf5ec829
-SHA1: 8639be2039151c6a8f695f1bf550ade6f06c877a
-SHA256: 63ef1f44cc8d22272f95446842e756cfc165297ede778e99d1b24da5ab4dcb80
+Suggests: mosquitto, mosquitto-clients
+Filename: ./send-to-influx_4.4_all.deb
+Size: 3130906
+MD5sum: 0d84c78bc92762412f8d7351b94df2fc
+SHA1: 1e73a07a2cdee89fc736fd5362911d169cd476da
+SHA256: 188b029d8c9efd2c2f4db12c8d35aa71878d73ff67bc7f6a8ce1084b912a8fef
 Section: utils
 Priority: optional
 Description: Collects data from smart home / energy devices and writes it to InfluxDB
  send-to-influx polls Hue, MyEnergi, Octopus, Open-Meteo, National Grid Carbon
- Intensity and Speedtest sources and writes the results to InfluxDB using the
- line protocol, for visualisation in Grafana.
+ Intensity, Nuki smart locks (via MQTT) and Speedtest sources and writes the
+ results to InfluxDB using the line protocol, for visualisation in Grafana.
+ .
+ The Nuki source needs an MQTT broker on the local network - mosquitto (and
+ mosquitto-clients, for verifying the setup) are suggested rather than
+ depended on, since the broker may equally run on a different host.
 
