@@ -1,14 +1,15 @@
 Package: send-to-influx
-Version: 5.0
+Version: 5.1
 Architecture: all
 Maintainer: Gavin Lucas
 Depends: debconf (>= 0.5), python3 (>= 3.10), python3 (<< 3.31)
+Recommends: rsyslog, logrotate
 Suggests: mosquitto, mosquitto-clients
-Filename: ./send-to-influx_5.0_all.deb
-Size: 22737856
-MD5sum: b1b8e1a0ad413227472d5fae6810b6b6
-SHA1: b27ed12595c3dffe5b38d65c155cb870b4ebcd73
-SHA256: 280aecd5accce801b694118bb6fa2a298e1ae25713facef6bf1011243517f486
+Filename: ./send-to-influx_5.1_all.deb
+Size: 22802744
+MD5sum: f73381c0e18e0a82cbe47e4378dc1167
+SHA1: e26e4b4684e3eab3e19f45d9b1c7546129e777fc
+SHA256: d59b0056d0cc0282fdd263cfad31ec685924245182ccf4ff7b65a033b1e3da14
 Section: utils
 Priority: optional
 Description: Collects data from smart home / energy devices and writes it to InfluxDB
