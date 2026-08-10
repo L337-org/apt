@@ -83,14 +83,22 @@ jobs:
         working-directory: scratch
         run: ../main/scripts/build-index.sh
 
-      - name: The generated index must list at least one package
+      - name: The generated index must list at least one package record
         working-directory: scratch
         run: |
           # Guards against the index generating "successfully" but empty, which would
           # publish a repo that resolves for clients and offers them nothing.
-          count=$(grep -c '^Package: ' Packages || true)
-          if [ "${count:-0}" -lt 1 ]; then
-            echo "::error::Generated Packages index contains no packages." >&2
+          #
+          # Count records and distinct names separately. Under --multiversion each
+          # retained version gets its own stanza, so a `^Package:` count is a count of
+          # RECORDS, not of packages: five stanzas of one package at five versions is the
+          # normal case here, and calling that "5 packages" would misread the index.
+          # Both numbers are logged because their ratio is what shows --multiversion
+          # actually took effect.
+          records=$(grep -c '^Package: ' Packages || true)
+          names=$(grep '^Package: ' Packages | sort -u | wc -l | tr -d ' ')
+          if [ "${records:-0}" -lt 1 ]; then
+            echo "::error::Generated Packages index contains no package records." >&2
             exit 1
           fi
-          echo "Index lists ${count} package(s)."
+          echo "Index lists ${records} package record(s) covering ${names} distinct package name(s)."
