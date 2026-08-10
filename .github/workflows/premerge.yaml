@@ -38,9 +38,14 @@ jobs:
           # signing key - so every third-party action is pinned to an immutable commit.
           # Dependabot bumps the SHA and rewrites the trailing "# vX.Y.Z" comment, so
           # pinning does not mean going stale. Local actions (./...) are exempt.
+          #
+          # Quoting is optional in YAML, so `uses: "owner/action@<sha>"` is exactly as
+          # pinned as the bare form. Both are accepted: a guard that fails a legitimately
+          # pinned action is one someone eventually switches off wholesale, which costs
+          # more than it ever caught.
           bad=$(grep -rnE '^[[:space:]]*(-[[:space:]]+)?uses:' .github/workflows .github/actions 2>/dev/null \
-                | grep -vE 'uses:[[:space:]]*\./' \
-                | grep -vE 'uses:[[:space:]]*[^[:space:]]+@[0-9a-f]{40}([[:space:]]|$)' \
+                | grep -vE "uses:[[:space:]]*[\"']?\./" \
+                | grep -vE "uses:[[:space:]]*[\"']?[^[:space:]\"']+@[0-9a-f]{40}[\"']?([[:space:]]|\$)" \
                 || true)
           if [ -n "$bad" ]; then
             echo "::error::Every third-party action must be pinned to a full 40-hex commit SHA." >&2
