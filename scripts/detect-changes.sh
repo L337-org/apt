@@ -22,8 +22,16 @@
 #   * Packages stanza ORDER can vary between runs without the content differing, since it
 #     follows directory traversal. A byte comparison would churn on that too, so Packages
 #     is compared as a sorted multiset of lines: identical lines in any order means an
-#     identical index. Packages.gz needs no special handling because build-index.sh passes
-#     gzip -n, making it a deterministic function of Packages.
+#     identical index.
+#
+#   * Packages.gz is excluded and restored alongside the other two DELIBERATELY, even
+#     though build-index.sh passes gzip -n and it is therefore a deterministic function of
+#     Packages today. It is excluded because it is derived: `Packages` is the thing worth
+#     comparing, and a difference in the .gz that its source does not explain could only
+#     come from the compression step changing - a different gzip, or -n being dropped -
+#     which would make it differ on every run and push an identical repo hourly. Excluding
+#     it means such a regression is harmless here rather than catastrophic. The trade-off
+#     is that it would also go unnoticed by this script, which is the right way round.
 
 set -euo pipefail
 

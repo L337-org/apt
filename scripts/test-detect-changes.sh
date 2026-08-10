@@ -15,10 +15,18 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 DETECT="$SCRIPT_DIR/detect-changes.sh"
 failures=0
 
+# Every fixture lives under one root, removed by a single trap. Deliberately not an array
+# of directories appended to by fixture(): that function is called via $(...), so it runs
+# in a subshell and any variable it set would be discarded - the cleanup would silently
+# track nothing. One parent directory has no such failure mode. A template argument rather
+# than -p keeps mktemp portable, since BSD mktemp has no -p.
+TMP_ROOT=$(mktemp -d)
+trap 'rm -rf "$TMP_ROOT"' EXIT
+
 # Build a repo with a committed index, then let the caller mutate the working tree.
 fixture() {
     local dir
-    dir=$(mktemp -d)
+    dir=$(mktemp -d "$TMP_ROOT/fixture.XXXXXX")
     git -C "$dir" init -q
     git -C "$dir" config user.email t@example.com
     git -C "$dir" config user.name Test
@@ -82,8 +90,10 @@ d=$(fixture)
 printf 'template changed\n' > "$d/README.md"
 check "template edited" true "$d"
 
-# 7. No Packages in HEAD at all - first ever run. Must publish.
-d=$(mktemp -d)
+# 7. No Packages in HEAD at all - first ever run. Must publish. Built by hand rather than
+#    via fixture(), since the point is that no index has ever been committed - but still
+#    under TMP_ROOT so the trap reaches it.
+d=$(mktemp -d "$TMP_ROOT/firstrun.XXXXXX")
 git -C "$d" init -q
 git -C "$d" config user.email t@example.com
 git -C "$d" config user.name Test
