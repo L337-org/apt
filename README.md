@@ -5,3 +5,6 @@ This branch is the flat APT repository served at https://apt.l337.org/ for L337-
 It is regenerated automatically by the aggregator workflow in
 [L337-org/apt](https://github.com/L337-org/apt) - don't edit it by hand, changes will be
 overwritten on the next run. See that repo's README for the design and for how to add a project.
+
+The index lists every version the aggregator retains, not only the newest, so a particular
+version can be installed with `apt install <package>=<version>`.
