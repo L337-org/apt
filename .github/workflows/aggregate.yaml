@@ -50,17 +50,17 @@ jobs:
       - name: Copy in templates (CNAME, keyrings, index.html, README)
         run: cp -a main/templates/. gh-pages/
 
+      # Regenerated on EVERY run, before change detection, so that a change to how the
+      # index is built reaches the published repo on the next run instead of waiting for
+      # an unrelated .deb or template to change. Needs no secrets - signing is separate.
+      - name: Regenerate the index (unsigned)
+        working-directory: gh-pages
+        run: ../main/scripts/build-index.sh
+
       - name: Detect changes
         id: detect
         working-directory: gh-pages
-        run: |
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No .deb or template changes - skipping index regeneration and commit."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            git status --short
-          fi
+        run: ../main/scripts/detect-changes.sh
 
       - name: Import APT signing key
         if: steps.detect.outputs.changed == 'true'
@@ -74,13 +74,14 @@ jobs:
           mkdir -m 700 "$APT_GNUPGHOME"
           printf '%s' "$APT_GPG_PRIVATE_KEY" | base64 -d | GNUPGHOME="$APT_GNUPGHOME" gpg --batch --import
 
-      - name: Regenerate and sign the index
+      # Sign only - the index was already generated above. Regenerating it here would
+      # re-stamp Release with a new Date: after detection had settled, defeating the point.
+      - name: Sign the index
         if: steps.detect.outputs.changed == 'true'
         working-directory: gh-pages
         env:
           GNUPGHOME: ${{ env.APT_GNUPGHOME }}
         run: |
-          ../main/scripts/build-index.sh
           gpg --batch --yes -abs -o Release.gpg Release
           gpg --batch --yes --clearsign -o InRelease Release
 
