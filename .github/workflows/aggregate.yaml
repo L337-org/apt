@@ -27,12 +27,12 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out main (config + templates)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: main
 
       - name: Check out gh-pages (the published repo)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: gh-pages
           path: gh-pages
@@ -42,44 +42,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y dpkg-dev gnupg
 
       - name: Sync .deb files from source repos' GitHub Releases
-        run: |
-          python3 - <<'EOF'
-          import json, os, subprocess, sys, urllib.request
-
-          try:
-              import yaml
-              with open("main/repos.yaml") as f:
-                  config = yaml.safe_load(f)
-          except ImportError:
-              sys.exit("PyYAML missing on runner - install python3-yaml in this step")
-
-          wanted = {}  # filename -> download url
-          for entry in config["repos"]:
-              repo = entry["repo"]
-              keep = int(entry.get("keep_last_n", 5))
-              releases = json.loads(subprocess.check_output(
-                  ["gh", "api", f"repos/{repo}/releases?per_page=100"]))
-              with_debs = 0
-              for rel in releases:  # newest first
-                  debs = [a for a in rel["assets"] if a["name"].endswith(".deb")]
-                  if not debs:
-                      continue
-                  for a in debs:
-                      wanted[a["name"]] = a["browser_download_url"]
-                  with_debs += 1
-                  if with_debs >= keep:
-                      break
-              print(f"{repo}: {with_debs} releases with .deb assets selected")
-
-          have = {f for f in os.listdir("gh-pages") if f.endswith(".deb")}
-          for name in sorted(have - set(wanted)):
-              print(f"prune: {name}")
-              os.remove(os.path.join("gh-pages", name))
-          for name, url in sorted(wanted.items()):
-              if name not in have:
-                  print(f"fetch: {name}")
-                  urllib.request.urlretrieve(url, os.path.join("gh-pages", name))
-          EOF
+        run: python3 main/scripts/sync-debs.py --repos-config main/repos.yaml --dest gh-pages
 
       - name: Copy in templates (CNAME, keyrings, index.html, README)
         run: cp -a main/templates/. gh-pages/
@@ -114,9 +77,7 @@ jobs:
         env:
           GNUPGHOME: ${{ env.APT_GNUPGHOME }}
         run: |
-          dpkg-scanpackages . /dev/null > Packages
-          gzip -9c Packages > Packages.gz
-          apt-ftparchive release . > Release
+          ../main/scripts/build-index.sh
           gpg --batch --yes -abs -o Release.gpg Release
           gpg --batch --yes --clearsign -o InRelease Release
 

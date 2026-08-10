@@ -1,0 +1,20 @@
+# Keep GitHub Actions reasonably current.
+#
+# Actions here are pinned to immutable commit SHAs, enforced by the action-pins job in
+# premerge.yaml. Pinning and updating are complementary, not alternatives: the pin stops
+# a tag being repointed under us, and Dependabot stops the pin going stale - it bumps the
+# SHA and rewrites the trailing "# vX.Y.Z" comment.
+#
+# Grouped into one PR because this repo has a single workflow set; the premerge checks
+# give that PR something to gate on.
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"

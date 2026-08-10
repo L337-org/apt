@@ -1,0 +1,88 @@
+name: 'Check inbound changes'
+
+# This repo has no unit tests - it is one workflow, a config file and a template set.
+# These checks exist so that a change here arrives with something to gate on. Before
+# them, aggregate.yaml ran only on a schedule and on dispatch, so a pull request (a
+# Dependabot action bump in particular) carried no status checks at all, and a bump that
+# broke publishing would only surface on the next hourly run.
+#
+# The dry run deliberately stops short of signing and pushing: it calls the same
+# scripts/ that the publishing run calls, but is never given the signing secrets, so it
+# cannot touch gh-pages even by mistake.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: premerge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  action-pins:
+    name: Action pins are immutable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Every third-party `uses:` must name a 40-hex commit SHA
+        run: |
+          # A tag or branch ref can be repointed by the action's owner at any time, and
+          # the aggregate workflow imports both the APT signing key and the commit
+          # signing key - so every third-party action is pinned to an immutable commit.
+          # Dependabot bumps the SHA and rewrites the trailing "# vX.Y.Z" comment, so
+          # pinning does not mean going stale. Local actions (./...) are exempt.
+          bad=$(grep -rnE '^[[:space:]]*(-[[:space:]]+)?uses:' .github/workflows .github/actions 2>/dev/null \
+                | grep -vE 'uses:[[:space:]]*\./' \
+                | grep -vE 'uses:[[:space:]]*[^[:space:]]+@[0-9a-f]{40}([[:space:]]|$)' \
+                || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Every third-party action must be pinned to a full 40-hex commit SHA." >&2
+            printf '%s\n' "$bad" >&2
+            exit 1
+          fi
+          echo "All action references are pinned to commit SHAs."
+
+  aggregate-dry-run:
+    name: Aggregate dry run (no signing, no push)
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: main
+
+      - name: Install apt repo tooling
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev gnupg
+
+      - name: Sync .deb files into a scratch directory
+        run: |
+          mkdir -p scratch
+          python3 main/scripts/sync-debs.py --repos-config main/repos.yaml --dest scratch
+
+      - name: Copy in templates (CNAME, keyrings, index.html, README)
+        run: cp -a main/templates/. scratch/
+
+      - name: Regenerate the index (unsigned)
+        working-directory: scratch
+        run: ../main/scripts/build-index.sh
+
+      - name: The generated index must list at least one package
+        working-directory: scratch
+        run: |
+          # Guards against the index generating "successfully" but empty, which would
+          # publish a repo that resolves for clients and offers them nothing.
+          count=$(grep -c '^Package: ' Packages || true)
+          if [ "${count:-0}" -lt 1 ]; then
+            echo "::error::Generated Packages index contains no packages." >&2
+            exit 1
+          fi
+          echo "Index lists ${count} package(s)."
