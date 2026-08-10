@@ -8,6 +8,9 @@
 
 set -euo pipefail
 
-dpkg-scanpackages . /dev/null > Packages
+# --multiversion: without it dpkg-scanpackages emits only the newest version of each
+# package, so repos.yaml's keep_last_n would store several .deb files while the index
+# advertised just one - leaving the rest present on disk but uninstallable.
+dpkg-scanpackages --multiversion . /dev/null > Packages
 gzip -9c Packages > Packages.gz
 apt-ftparchive release . > Release
