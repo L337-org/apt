@@ -66,7 +66,10 @@ jobs:
           path: main
 
       - name: Install apt repo tooling
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev gnupg
+        # dpkg-dev: dpkg-scanpackages. apt-utils: apt-ftparchive. python3-yaml:
+        # sync-debs.py's config parsing. Named explicitly rather than relying on
+        # whatever the ubuntu-latest image happens to preinstall.
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils gnupg python3-yaml
 
       - name: Sync .deb files into a scratch directory
         run: |

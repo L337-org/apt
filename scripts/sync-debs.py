@@ -68,13 +68,29 @@ def sync(wanted, dest):
     returns: None
     """
     have = {f for f in os.listdir(dest) if f.endswith(".deb")}
+
+    # Fetch before pruning, and download via a temporary name so a .deb only ever appears
+    # at its final path once complete. A failed or partial download then leaves the
+    # destination exactly as it was, rather than already missing what was pruned. The
+    # publishing workflow happens to gate its push on every step succeeding, so a mid-run
+    # failure could not reach the served repo either way - but this function should be
+    # correct on its own terms, not because of how one caller sequences its steps.
+    for name, url in sorted(wanted.items()):
+        if name in have:
+            continue
+        print(f"fetch: {name}")
+        final = os.path.join(dest, name)
+        partial = f"{final}.part"
+        try:
+            urllib.request.urlretrieve(url, partial)
+            os.replace(partial, final)  # atomic within one filesystem
+        finally:
+            if os.path.exists(partial):
+                os.remove(partial)
+
     for name in sorted(have - set(wanted)):
         print(f"prune: {name}")
         os.remove(os.path.join(dest, name))
-    for name, url in sorted(wanted.items()):
-        if name not in have:
-            print(f"fetch: {name}")
-            urllib.request.urlretrieve(url, os.path.join(dest, name))
 
 
 def main():

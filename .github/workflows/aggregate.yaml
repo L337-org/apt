@@ -39,7 +39,10 @@ jobs:
           fetch-depth: 0
 
       - name: Install apt repo tooling
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev gnupg
+        # dpkg-dev: dpkg-scanpackages. apt-utils: apt-ftparchive. python3-yaml:
+        # sync-debs.py's config parsing. Named explicitly rather than relying on
+        # whatever the ubuntu-latest image happens to preinstall.
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils gnupg python3-yaml
 
       - name: Sync .deb files from source repos' GitHub Releases
         run: python3 main/scripts/sync-debs.py --repos-config main/repos.yaml --dest gh-pages
