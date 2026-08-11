@@ -62,8 +62,15 @@ if [ "$changed" = false ]; then
     trap 'rm -f "$committed" "$regenerated"' EXIT
     # No Packages in HEAD (first ever run) leaves the file empty, so any generated index
     # counts as a change - which is what we want.
-    git show HEAD:Packages 2>/dev/null | sort > "$committed" || : > "$committed"
-    sort Packages > "$regenerated"
+    # LC_ALL=C: byte order, which is a TOTAL order, so no two distinct lines ever compare
+    # equal. Locale collation can rank lines differently between environments, but more
+    # importantly it can treat lines differing only in punctuation or whitespace as EQUAL -
+    # and sort is not stable by default, so tied lines may be emitted in either order. Two
+    # sorts of identical content could then differ byte-for-byte, reporting a change that
+    # does not exist and publishing an identical repo every hour. Debian index files carry
+    # exactly the kind of lines that invites: checksum entries indented by a space.
+    git show HEAD:Packages 2>/dev/null | LC_ALL=C sort > "$committed" || : > "$committed"
+    LC_ALL=C sort Packages > "$regenerated"
     if ! cmp -s "$committed" "$regenerated"; then
         changed=true
         reason="index content changed"

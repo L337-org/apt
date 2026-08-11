@@ -49,7 +49,13 @@ fixture() {
 check() {
     local name=$1 expected=$2 dir=$3
     local got
-    got=$(cd "$dir" && bash "$DETECT" 2>/dev/null | grep '^changed=' | cut -d= -f2)
+    # Deliberately tolerant. Under `set -euo pipefail`, a detector that errored or printed
+    # no changed= line would make grep exit non-zero, fail the assignment, and abort the
+    # whole run with NO summary - the least useful thing a harness can do at precisely the
+    # moment something is broken. Swallow it here and let the comparison below record a
+    # failure, so every case still gets a verdict and the run ends with a count.
+    got=$( (cd "$dir" && bash "$DETECT" 2>/dev/null) | grep '^changed=' | cut -d= -f2 || true )
+    [ -n "$got" ] || got="(no changed= line)"
     if [ "$got" = "$expected" ]; then
         printf 'ok    %-46s changed=%s\n' "$name" "$got"
     else
