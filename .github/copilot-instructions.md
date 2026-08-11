@@ -1,0 +1,158 @@
+# Copilot Instructions for apt
+
+## Project Overview
+
+`apt` owns the flat APT (Debian package) repository served at <https://apt.l337.org/> — the
+`gh-pages` branch, published via GitHub Pages with a custom domain (`templates/CNAME`). It has no
+application code: one scheduled workflow, a small Python/Bash `scripts/` set, a `repos.yaml`
+config listing which org repos contribute packages, and the static files (`templates/`) copied
+into the published branch. It exists so every L337-org project that ships a `.deb` can be
+installed from one `apt` source line instead of each project running its own repository
+infrastructure.
+
+## Architecture
+
+### Design: single-writer, pull-based aggregation
+
+The aggregator *pulls* `.deb` release assets from other repos rather than having them push here.
+Release assets on public repos are anonymously downloadable, so **no cross-repo credentials exist
+anywhere in this design** — producing projects never authenticate to this repo, and this repo
+pushes only to its own `gh-pages` with its own default `GITHUB_TOKEN`. Onboarding a new project is
+just: attach a `.deb` to its GitHub Release, then add one entry to `repos.yaml`.
+
+### `.github/workflows/aggregate.yaml` — the publishing run
+
+Runs hourly (`cron: "17 * * * *"`) and on `workflow_dispatch`, with `concurrency.group: aggregate`
+(`cancel-in-progress: false`, so a slow run is waited out rather than aborted mid-publish). Steps,
+in order:
+
+1. Check out `main` (config + templates) and `gh-pages` (the published tree) side by side.
+2. `scripts/sync-debs.py` fetches missing `.deb`s per `repos.yaml` and prunes ones outside the
+   configured `keep_last_n` window.
+3. Copy `templates/` over `gh-pages` verbatim.
+4. `scripts/build-index.sh` regenerates `Packages`/`Packages.gz`/`Release` — **unconditionally,
+   before change detection**, so a change to *how* the index is built reaches the published repo
+   on the very next run rather than waiting for an unrelated `.deb` or template to change.
+5. `scripts/detect-changes.sh` decides whether anything is actually worth publishing; if not, the
+   job stops here with no commit (hourly runs between releases are no-ops).
+6. Only when something changed: import `APT_GPG_PRIVATE_KEY` into its own GnuPG homedir and sign
+   `Release` → `Release.gpg`/`InRelease` (the index was already generated in step 4 — re-generating
+   here would re-stamp a new `Date:` after detection had already settled, defeating the point).
+7. Import `CI_COMMIT_SIGNING_KEY` into a **second, separate** GnuPG homedir, then commit and push
+   to `gh-pages` signed with it. The `gh-pages` branch ruleset requires verified commit signatures,
+   and the two keys are kept in separate `GNUPGHOME`s so git's invocation of `gpg` for commit
+   signing can only ever reach the commit-signing key, never the APT signing key — deliberate
+   isolation between two independent trust domains (see "Keys" below), not just tidiness.
+
+Both signing-secret imports fail loudly (`::error` + non-zero exit) if the secret is unset, rather
+than silently skipping signing.
+
+### `.github/workflows/premerge.yaml` — the PR gate
+
+Before this workflow existed, `aggregate.yaml` ran only on schedule/dispatch, so a pull request
+(a Dependabot action bump, in particular) carried no status checks at all — a bump that broke
+publishing would only surface on the next hourly run against the real `gh-pages`. Three jobs, all
+required status checks on `main`'s ruleset:
+
+- **`action-pins`**: greps every `uses:` in `.github/workflows` and `.github/actions` and fails
+  unless it names a 40-hex commit SHA. This workflow imports both signing keys, so a mutable
+  tag/branch ref on a third-party action is a real supply-chain risk here, not a style nit; local
+  actions (`./...`) are exempt, and Dependabot bumps the SHA (rewriting the trailing `# vX.Y.Z`
+  comment) so pinning doesn't mean going stale.
+- **`change-detection`**: runs `scripts/test-detect-changes.sh` against synthetic fixtures.
+- **`aggregate-dry-run`**: runs the *same* `sync-debs.py` and `build-index.sh` the publishing run
+  uses, into a scratch directory, then asserts the generated `Packages` has at least one record
+  (guards against the index "succeeding" empty and publishing a repo that resolves for clients but
+  offers nothing).
+
+The dry run deliberately stops short of signing and pushing: it calls the same `scripts/` the
+publishing run calls (so it can't drift from what actually ships), but is **never given the signing
+secrets**, so it cannot touch `gh-pages` even by mistake — the job's `permissions: contents: read`
+at the workflow level backs that up structurally, not just by omission of secrets.
+
+### `scripts/build-index.sh`
+
+`dpkg-scanpackages --multiversion .` — the `--multiversion` flag matters because `repos.yaml`'s
+`keep_last_n` retains several `.deb`s per package; without it the index would advertise only the
+newest, leaving older ones present on disk but uninstallable. `gzip -9nc` (`-n` omits the
+filename/mtime header) so `Packages.gz` is byte-identical across runs when `Packages` is, which
+matters to change detection. `apt-ftparchive release .` produces `Release`, which is **not**
+reproducible — it stamps a `Date:` field on every run — a fact `detect-changes.sh` has to work
+around.
+
+### `scripts/detect-changes.sh`
+
+Decides whether there's anything worth committing, run after the index is regenerated. Plain
+`git status` doesn't work: `Release`'s `Date:` churns every run regardless of real change, and
+`Packages` stanza order can vary with directory traversal without the content differing. So it
+excludes `Packages`/`Packages.gz`/`Release` from the general diff and instead compares `Packages`
+as an `LC_ALL=C`-sorted multiset of lines against the committed copy (locale collation is not a
+total order and can rank distinct lines as equal). `--untracked-files=all` is load-bearing, not
+decoration — with the ambient `status.showUntrackedFiles=no`, a newly-fetched `.deb` would report
+no change and never get published. `Packages.gz` is excluded from comparison on the same terms as
+`Release` even though it's currently a deterministic function of `Packages` — a future regression
+in the gzip step (wrong flags, different gzip) would then differ every run rather than being
+treated as a real change, which is judged the safer failure mode than the alternative. On "no
+change" it restores the volatile files so the tree is left clean.
+
+### `scripts/sync-debs.py`
+
+Shared by both workflows (imported/run the same way by the publishing job and the premerge dry
+run) so the dry run can't test a copy that drifts from what actually publishes. `select_wanted()`
+reads `repos.yaml` and, per repo, takes the newest `keep_last_n` releases carrying a `.deb` via
+`gh api repos/{repo}/releases`. `sync()` fetches before pruning, via a temp file + atomic rename,
+so a failed/partial download can't leave the destination already missing what was about to be
+pruned. `main()` refuses to prune anything if `select_wanted()` returns empty — an empty result is
+always a config mistake or an upstream anomaly, and pruning on it would take the whole published
+channel offline.
+
+### `scripts/test-detect-changes.sh`
+
+Exercises `detect-changes.sh` against synthetic, hand-built git repos — no `dpkg`/`gnupg` needed,
+so it runs anywhere including a developer machine. The two "must NOT publish" cases (Release
+`Date:`-only churn, reordered-but-identical `Packages`) are the load-bearing ones: a detector that
+can't say "no" would sign and push an unchanged repo every hour forever, and one that can't say
+"yes" is how an index-generation change went unpublished in the first place (the original
+incident this script and `premerge.yaml` both exist to catch).
+
+### `repos.yaml`
+
+The only mutable config: a list of `{repo, keep_last_n}` entries, one per producing project.
+Adding a project here (after it attaches a `.deb` to its own releases) is the entire onboarding
+step — no code change required.
+
+### `templates/`
+
+Copied verbatim onto `gh-pages` every run: `CNAME` (the custom domain), `.nojekyll` (disables
+GitHub Pages' Jekyll processing, which would otherwise mangle the flat repo layout), `index.html`
+(the landing page at the domain root), `README.md` (the *published* branch's own README, warning
+against hand-editing since the next run overwrites it), and the two public keyring files —
+`l337-apt.gpg` (current name) and `send-to-influx.gpg` (the identical key under its historical
+name, kept so pre-existing installs referencing it never need to re-fetch).
+
+## Keys
+
+Two GPG keys, deliberately independent trust domains and rotation cycles:
+
+- **APT package signing** (`APT_GPG_PRIVATE_KEY` secret) signs the package index
+  (`Release.gpg`/`InRelease`) so `apt` clients can verify packages they install. Its public half is
+  what's published as `templates/l337-apt.gpg`/`send-to-influx.gpg`.
+- **CI commit signing** (`CI_COMMIT_SIGNING_KEY` secret) signs the git commit pushed to
+  `gh-pages`, required by that branch's ruleset (`required_signatures`). Its public half is
+  registered to the maintainer's own GitHub account, not published in this repo.
+
+Never assume either secret's value; both are opaque to this repo's own code and only ever touched
+by `gpg --import` inside `aggregate.yaml`, guarded so a no-op hourly run never imports either key
+at all.
+
+## Conventions
+
+- No unit test framework — `scripts/test-detect-changes.sh` is the one test, run directly by
+  `premerge.yaml`, not through a runner.
+- Every third-party GitHub Action `uses:` must be pinned to a 40-hex commit SHA (`action-pins`
+  job enforces it); Dependabot (`.github/dependabot.yml`, weekly, grouped into one PR) bumps the
+  SHA and its trailing `# vX.Y.Z` comment.
+- Bash scripts run under `set -euo pipefail`; comments in the workflows and scripts carry the
+  *why* for non-obvious steps (change-detection edge cases, key isolation, reproducibility
+  quirks) — read them before changing behaviour, and extend them rather than paraphrasing when
+  editing nearby code.
