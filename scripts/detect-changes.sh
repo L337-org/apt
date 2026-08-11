@@ -42,7 +42,14 @@ reason=""
 
 # 1. Anything outside the generated index files - a .deb added or pruned, a template
 #    edited. Untracked files count, which is how a newly fetched .deb registers.
-status=$(git status --porcelain -- . \
+#
+#    --untracked-files=all is load-bearing, not decoration. `git status` honours
+#    status.showUntrackedFiles, and with that set to "no" a newly fetched .deb reports
+#    nothing at all: this returns empty, Packages happens to match, and the detector says
+#    changed=false. A brand new release would then never be published, silently. Ambient
+#    git config must not be able to decide whether a package reaches users, so the flag is
+#    passed explicitly rather than relying on the default.
+status=$(git status --porcelain --untracked-files=all -- . \
     ':(exclude)Packages' ':(exclude)Packages.gz' ':(exclude)Release' \
     ':(exclude)Release.gpg' ':(exclude)InRelease')
 if [ -n "$status" ]; then

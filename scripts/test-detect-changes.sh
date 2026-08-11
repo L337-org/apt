@@ -92,6 +92,15 @@ d=$(fixture)
 : > "$d/alpha_2.0_all.deb"
 check "new untracked .deb" true "$d"
 
+# 4b. The same new .deb, but with status.showUntrackedFiles=no set. Must STILL publish.
+#     Without --untracked-files=all in the detector this reports changed=false and a brand
+#     new release never reaches users - a missed publication, which is the worse direction
+#     for a package channel than an extra one.
+d=$(fixture)
+: > "$d/alpha_2.0_all.deb"
+git -C "$d" config status.showUntrackedFiles no
+check "new .deb, showUntrackedFiles=no" true "$d"
+
 # 5. A pruned .deb. Must publish.
 d=$(fixture)
 rm "$d/alpha_1.0_all.deb"
