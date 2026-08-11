@@ -52,8 +52,13 @@ fi
 
 # 2. The index content itself, compared order-insensitively.
 if [ "$changed" = false ]; then
-    committed=$(mktemp)
-    regenerated=$(mktemp)
+    # Explicit templates: a bare `mktemp` works on GNU and macOS alike, but macOS documents
+    # the form as requiring a template, so the documented spelling is the safer one to rely
+    # on for a script that also runs outside CI.
+    tmpdir=${TMPDIR:-/tmp}
+    tmpdir=${tmpdir%/}
+    committed=$(mktemp "$tmpdir/detect-changes-committed.XXXXXX")
+    regenerated=$(mktemp "$tmpdir/detect-changes-regenerated.XXXXXX")
     trap 'rm -f "$committed" "$regenerated"' EXIT
     # No Packages in HEAD (first ever run) leaves the file empty, so any generated index
     # counts as a change - which is what we want.

@@ -18,9 +18,15 @@ failures=0
 # Every fixture lives under one root, removed by a single trap. Deliberately not an array
 # of directories appended to by fixture(): that function is called via $(...), so it runs
 # in a subshell and any variable it set would be discarded - the cleanup would silently
-# track nothing. One parent directory has no such failure mode. A template argument rather
-# than -p keeps mktemp portable, since BSD mktemp has no -p.
-TMP_ROOT=$(mktemp -d)
+# track nothing. One parent directory has no such failure mode.
+#
+# Every mktemp call passes an explicit template. A bare `mktemp -d` does work on both GNU
+# and macOS, but macOS's documented synopsis is `mktemp [-d] [-p tmpdir] [-q] [-t prefix]
+# [-u] template ...` - the bare form is a real but undocumented fallback. Since this suite
+# is meant to run on a developer machine, resting on the documented form costs nothing.
+tmpdir=${TMPDIR:-/tmp}
+tmpdir=${tmpdir%/}
+TMP_ROOT=$(mktemp -d "$tmpdir/detect-changes-tests.XXXXXX")
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 # Build a repo with a committed index, then let the caller mutate the working tree.
