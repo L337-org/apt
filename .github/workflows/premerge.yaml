@@ -54,6 +54,21 @@ jobs:
           fi
           echo "All action references are pinned to commit SHAs."
 
+  change-detection:
+    name: Change detection behaves
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test detect-changes.sh against synthetic repos
+        # Needs only git - the fixtures fabricate Packages/Release rather than running
+        # dpkg-scanpackages. The two negative cases are the load-bearing ones: a detector
+        # that cannot say "no" makes the aggregator sign and push an identical repo every
+        # hour, and one that cannot say "yes" is how an index-generation change went
+        # unpublished in the first place.
+        run: scripts/test-detect-changes.sh
+
   aggregate-dry-run:
     name: Aggregate dry run (no signing, no push)
     runs-on: ubuntu-latest

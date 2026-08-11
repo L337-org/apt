@@ -12,5 +12,13 @@ set -euo pipefail
 # package, so repos.yaml's keep_last_n would store several .deb files while the index
 # advertised just one - leaving the rest present on disk but uninstallable.
 dpkg-scanpackages --multiversion . /dev/null > Packages
-gzip -9c Packages > Packages.gz
+
+# -n omits the input filename and mtime from the gzip header. Without it Packages.gz
+# differs byte-for-byte on every run even when Packages is identical, because the header
+# carries the regenerated file's timestamp - which would make change detection see churn
+# where there is none.
+gzip -9nc Packages > Packages.gz
+
+# Release is NOT reproducible: apt-ftparchive stamps a Date: field into it, so it differs
+# on every run by construction. detect-changes.sh accounts for that.
 apt-ftparchive release . > Release
