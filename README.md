@@ -37,6 +37,10 @@ never need to re-fetch.)
 ## Keys
 
 - APT package signing: `E46E42647810338BDA88730E97CF6528E790FC9E` (public halves published as
-  `l337-apt.gpg` / `send-to-influx.gpg`, committed in `templates/`).
+  `l337-apt.gpg` / `send-to-influx.gpg`, committed in `templates/`). **Must be the binary
+  (dearmored) export** — `signed-by=` hands the file straight to `gpgv`, which cannot parse an
+  ASCII-armored key and fails every install with `NO_PUBKEY`/"not signed". Re-export as
+  `gpg --export <fingerprint> > templates/l337-apt.gpg` (no `--armor`), or pipe an armored export
+  through `gpg --dearmor`, and copy the identical bytes to `templates/send-to-influx.gpg`.
 - CI commit signing: `EA20403748B47716E87D56E37FECBE1F16617F8B` (public half registered to the
   maintainer's GitHub account; separate trust domain and rotation cycle from the APT key).
