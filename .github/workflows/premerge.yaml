@@ -73,6 +73,21 @@ jobs:
         # unpublished in the first place.
         run: scripts/test-detect-changes.sh
 
+  index-guard:
+    name: Index guard refuses a malformed Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test build-index.sh against a deliberately broken generator
+        # Needs neither dpkg nor apt-utils - the suite stubs both, so it runs here and on a
+        # developer machine alike. Separate from aggregate-dry-run on purpose: that job proves
+        # the guard ACCEPTS a real index, and this one proves it still REJECTS a bad one. A
+        # guard that has quietly stopped firing is indistinguishable from a passing guard in
+        # the dry run, which is precisely the gap this closes.
+        run: scripts/test-build-index.sh
+
   aggregate-dry-run:
     name: Aggregate dry run (no signing, no push)
     runs-on: ubuntu-latest

@@ -60,6 +60,11 @@ required status checks on `main`'s ruleset:
   actions (`./...`) are exempt, and Dependabot bumps the SHA (rewriting the trailing `# vX.Y.Z`
   comment) so pinning doesn't mean going stale.
 - **`change-detection`**: runs `scripts/test-detect-changes.sh` against synthetic fixtures.
+- **`index-guard`**: runs `scripts/test-build-index.sh`, which drives `build-index.sh` against a
+  *deliberately broken* `apt-ftparchive` stub. Deliberately separate from `aggregate-dry-run`:
+  that job proves the guard **accepts** a real index, this one proves it still **rejects** a bad
+  one. A guard that has quietly stopped firing is indistinguishable from a passing guard in the
+  dry run, which is the gap this closes. Needs no `dpkg`/`apt-utils` — the suite stubs both.
 - **`aggregate-dry-run`**: runs the *same* `sync-debs.py` and `build-index.sh` the publishing run
   uses, into a scratch directory, then asserts the generated `Packages` has at least one record
   (guards against the index "succeeding" empty and publishing a repo that resolves for clients but
@@ -146,6 +151,65 @@ back out, and the bad one stayed served until some unrelated `.deb` or template 
 A `Release`-only change is precisely the "a change to *how* the index is built" case that step 4
 of `aggregate.yaml` exists to publish.
 
+### `.github/workflows/channel-install.yaml` — does the published channel actually install?
+
+Daily (`cron: "17 5 * * *"`, offset from the daily external channel check) and on
+`workflow_dispatch`. Runs the **documented** two-line sources setup inside a
+`debian:stable-slim` container and installs every package the channel advertises. No secrets,
+`permissions: contents: read` — it only reads a public channel.
+
+It exists because everything else that watches the channel *inspects* it: the daily external
+check verifies versions, sizes, hashes and both signatures without ever running an apt client,
+and `aggregate-dry-run` builds an index in a scratch directory without ever installing from the
+published one. The `apt-get update` line is the real test — apt verifies `InRelease` against the
+keyring and checks `Packages` against the hashes in `Release`, so a bad signature or wrong hash
+fails there rather than being reasoned about. The final check is that the **installed** version
+equals the **advertised** candidate, which is what catches a channel serving something other
+than what its index claims.
+
+Three deliberate decisions, recorded so they are not re-litigated:
+
+- **It lives here, not in each producing project.** The channel is what is under test and this
+  repo is its single writer; a copy per producer would duplicate tests of infrastructure those
+  repos do not control.
+- **Upgrade testing is deliberately NOT here.** Upgrading from the previous release exercises a
+  package's own maintainer scripts, which belong with the code that produces them.
+- **No issue is filed on failure.** GitHub's own workflow-failure notification is the alert.
+  Considered and rejected as unnecessary, not overlooked.
+
+Two known limitations: the setup commands duplicate the two lines in `README.md` and can drift
+from them; and the package list comes from what apt parsed out of the index, so it covers future
+producers automatically but says nothing about a producer whose packages never reached the index
+at all.
+
+### `scripts/test-build-index.sh`
+
+Drives the real `build-index.sh` with `dpkg-scanpackages` and `apt-ftparchive` stubbed on `PATH`,
+so it runs anywhere including a developer machine. `$MODE` selects the malformation: well-formed,
+self-entry, entry for an absent file, wrong size, wrong hash, unrecognised algorithm, empty
+output. The stub computes **real** sizes and hashes from the real files for entries a scenario
+wants correct, so the well-formed case has to genuinely agree with the tree rather than passing by
+coincidence. `md5sum`/`sha*sum` are shimmed **only if missing** (macOS), so a Linux run uses the
+real binaries.
+
+Two things about its shape are load-bearing:
+
+- Cases assert **what the failure says**, not only that it happened. Removing the self-entry check
+  from the guard still produces a non-zero exit (the size check catches it incidentally), so only
+  the message assertion distinguishes the two.
+- The runner must **not** be called via `out=$(...)`. Command substitution runs it in a subshell,
+  where an incremented failure counter is discarded on exit and the suite reports success with a
+  broken case inside it. The output goes to a file and the status into a global for that reason.
+
+- Reading file modes portably needs the **GNU form first**: `stat -c '%a'` then `stat -f '%Lp'`.
+  BSD `stat` rejects `-c` and exits non-zero, so it falls through cleanly — but GNU `stat`
+  *accepts* `-f` (there it means "file system status") and prints `?` for an unknown directive
+  while **exiting zero**, so a BSD-first fallback silently yields `?` on Linux. That is exactly how
+  the mode assertion passed locally and failed in CI on the first run of this job.
+
+Mutation-verified: removing the self-entry check, defeating hash verification, silencing the
+unrecognised-algorithm notice, and dropping the `chmod` each fail the suite.
+
 ### `scripts/sync-debs.py`
 
 Shared by both workflows (imported/run the same way by the publishing job and the premerge dry
@@ -203,8 +267,9 @@ at all.
 
 ## Conventions
 
-- No unit test framework — `scripts/test-detect-changes.sh` is the one test, run directly by
-  `premerge.yaml`, not through a runner.
+- No unit test framework — `scripts/test-detect-changes.sh` and `scripts/test-build-index.sh` are
+  the tests, run directly by `premerge.yaml`, not through a runner. Both need only bash and (for
+  the first) git, so both run on a developer machine unchanged.
 - Every third-party GitHub Action `uses:` must be pinned to a 40-hex commit SHA (`action-pins`
   job enforces it); Dependabot (`.github/dependabot.yml`, weekly, grouped into one PR) bumps the
   SHA and its trailing `# vX.Y.Z` comment.
