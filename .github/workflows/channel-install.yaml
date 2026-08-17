@@ -80,13 +80,23 @@ jobs:
             # from a name hardcoded here: this then covers every producing project added to
             # repos.yaml in future without a second place to update. It also proves apt could
             # parse the index, not merely fetch it.
-            list=$(ls /var/lib/apt/lists/ | grep "apt.l337.org.*_Packages$" | head -1)
+            # A glob loop rather than `list=$(ls | grep ...)`: under `set -e` with pipefail, a
+            # grep that matches nothing exits 1, which fails the assignment and kills the script
+            # BEFORE the emptiness check below - so the diagnostic would never print and the job
+            # would fail with no output at all. A glob also matches the dots in the hostname
+            # literally, which the regex did not.
+            list=""
+            for candidate_list in /var/lib/apt/lists/*apt.l337.org*_Packages; do
+              [ -e "$candidate_list" ] || continue
+              list=$candidate_list
+              break
+            done
             if [ -z "$list" ]; then
               echo "::error::apt kept no Packages list for the channel - nothing was indexed." >&2
               ls -la /var/lib/apt/lists/ >&2
               exit 1
             fi
-            mapfile -t packages < <(awk "/^Package: /{print \$2}" "/var/lib/apt/lists/$list" | sort -u)
+            mapfile -t packages < <(awk "/^Package: /{print \$2}" "$list" | sort -u)
             if [ "${#packages[@]}" -eq 0 ]; then
               echo "::error::The channel advertises no packages at all." >&2
               exit 1
