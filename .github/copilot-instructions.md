@@ -93,13 +93,17 @@ for exactly that reason — 38 bytes being its own `Date:` line. **Never reintro
 `> Release` redirection here.**
 
 The script then **guards its own output**: every checksum entry in `Release` must name a file
-present in the tree at the size claimed, `Release` must not name itself, and both `Packages` and
-`Packages.gz` must be listed (so an empty `Release` can't pass by having nothing to check). The
-guard lives in the script rather than in `premerge.yaml` so that it also runs in the hourly
-publishing job, failing **before** the signing step instead of only gating pull requests. Sizes
-are checked, not hashes: a wrong hash on a right-sized file would mean `apt-ftparchive` itself
-miscomputed it, and the daily external channel check already verifies published hashes against
-what is served.
+present in the tree at the size **and hash** claimed, `Release` must not name itself, and both
+`Packages` and `Packages.gz` must be listed (so an empty `Release` can't pass by having nothing to
+check). The guard lives in the script rather than in `premerge.yaml` so that it also runs in the
+hourly publishing job, failing **before** the signing step instead of only gating pull requests.
+The hashes are checked as well as the sizes because `apt` verifies `Packages` against the hashes in
+`Release` — a wrong one there breaks `apt update` for every client, so it is worth catching before
+signing rather than after publishing. A section header names the algorithm for the entries beneath
+it (`MD5Sum`/`SHA1`/`SHA256`/`SHA512` → `md5sum`/`sha1sum`/`sha256sum`/`sha512sum`); an algorithm
+the script doesn't know emits a `::notice::` and has its size checked but not its hash, rather than
+being passed over silently, since a skipped check that looks like a passed one is how coverage
+quietly shrinks.
 
 ### `scripts/detect-changes.sh`
 

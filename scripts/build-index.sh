@@ -51,16 +51,18 @@ chmod 644 Release
 # on every run by construction. detect-changes.sh accounts for that.
 
 # Every checksum entry in Release must describe a file that is actually being served, at the
-# size claimed, and Release must never describe itself. That is the property the self-entry
-# above broke, asserted here rather than in premerge.yaml so that it runs in the hourly
-# publishing job too: a malformed index then fails before the signing step, instead of being
-# signed and pushed.
+# size AND hash claimed, and Release must never describe itself. That is the property the
+# self-entry above broke, asserted here rather than in premerge.yaml so that it runs in the
+# hourly publishing job too: a malformed index then fails before the signing step, instead of
+# being signed and pushed.
 #
-# Entry lines are the ones indented by a space - Date: and the section headers are not. Sizes
-# are checked rather than hashes: a hash disagreeing with a file of the right size would mean
-# apt-ftparchive had miscomputed it, a different failure from anything seen here, and the
-# daily external channel check already verifies the published hashes against what is served.
-while read -r _hash size name; do
+# The hashes matter as much as the sizes, because apt verifies Packages against the hashes in
+# Release: a wrong one there breaks `apt update` for every client, so it is worth catching
+# before signing rather than after publishing.
+#
+# Entry lines are the ones indented by a space - Date: and the section headers are not, and a
+# section header is what says which algorithm the entries under it use.
+while read -r section hash size name; do
     if [ "$name" = Release ]; then
         echo "::error::Generated Release lists a checksum entry for itself (${size} bytes)." >&2
         exit 1
@@ -74,7 +76,27 @@ while read -r _hash size name; do
         echo "::error::Generated Release declares ${name} as ${size} bytes; it is ${actual}." >&2
         exit 1
     fi
-done < <(awk '/^ /{print $1, $2, $3}' Release)
+    # An algorithm this script does not know about is reported rather than passed over in
+    # silence: a skipped check that looks like a passed one is how coverage quietly shrinks.
+    case $section in
+        MD5Sum) tool=md5sum ;;
+        SHA1) tool=sha1sum ;;
+        SHA256) tool=sha256sum ;;
+        SHA512) tool=sha512sum ;;
+        *)
+            echo "::notice::Release section '${section}' uses an algorithm this script cannot" \
+                 "verify; the size of ${name} was checked but its hash was not."
+            continue
+            ;;
+    esac
+    actual_hash=$("$tool" "$name" | cut -d' ' -f1)
+    if [ "$actual_hash" != "$hash" ]; then
+        echo "::error::Generated Release declares ${section} for ${name} as ${hash};" \
+             "it is ${actual_hash}." >&2
+        exit 1
+    fi
+done < <(awk '/^[A-Za-z0-9-]+:$/ {section = substr($0, 1, length($0) - 1); next}
+              /^ / {print section, $1, $2, $3}' Release)
 
 # ...and it must list both index files. Without this, an empty or truncated Release passes the
 # loop above by having no entries to check.
