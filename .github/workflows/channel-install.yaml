@@ -68,9 +68,19 @@ jobs:
             # conditions as a warning while still exiting zero. So W:/E: lines are treated as
             # failures - and only those, rather than any stderr output at all, since unrelated
             # benign chatter on stderr would otherwise fail this job every night for no reason.
+            # Any W:/E: is fatal, including one from Debian own repositories: a clean container
+            # doing one update should produce none, so an unexpected warning is worth stopping
+            # for. But the message must not claim the channel is at fault when the line came from
+            # somewhere else - a nightly job that misattributes its own findings sends whoever
+            # reads it to the wrong repository.
             apt-get update 2>/tmp/update.err || { cat /tmp/update.err >&2; exit 1; }
             if grep -qE "^(W|E):" /tmp/update.err; then
-              echo "::error::apt-get update reported problems against the channel:" >&2
+              if grep -qE "^(W|E):.*apt\.l337\.org" /tmp/update.err; then
+                echo "::error::apt-get update reported problems against the channel:" >&2
+              else
+                echo "::error::apt-get update reported warnings or errors, none of them naming" \
+                     "the channel - failing anyway, because a clean container should report none:" >&2
+              fi
               cat /tmp/update.err >&2
               exit 1
             fi
