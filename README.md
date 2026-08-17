@@ -19,6 +19,14 @@ branch, via GitHub Pages with a custom domain).
    (`APT_GPG_PRIVATE_KEY` secret), and pushes a signed commit (`CI_COMMIT_SIGNING_KEY` secret;
    the `gh-pages` ruleset requires verified signatures).
 
+## How we know the channel works
+
+`.github/workflows/channel-install.yaml` runs daily and installs from the published channel in a
+clean Debian container, using exactly the two commands documented below. It checks that the
+version apt actually installs is the version the index advertised, which is what would catch the
+channel serving something other than what it claims. Upgrade testing lives with each package's
+own repository rather than here, since upgrading exercises that package's maintainer scripts.
+
 ## Onboarding a new project
 
 1. Make the project's release workflow attach its `.deb` to the GitHub Release.
