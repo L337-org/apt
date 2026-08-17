@@ -47,6 +47,15 @@ in order:
 Both signing-secret imports fail loudly (`::error` + non-zero exit) if the secret is unset, rather
 than silently skipping signing.
 
+**A failed run files no issue, and that is a decision rather than an omission.** The org standard for
+unattended runs is normally to raise a deduplicated issue, and it was considered here after four
+consecutive hourly runs failed unnoticed during a GitHub incident. Rejected because an issue is only
+worth as much as its visibility, and the maintainer does not routinely watch **this** repo's issues,
+whereas GitHub's own workflow-failure notification does reach them — so filing one would be strictly
+less visible than the alert that already exists, while adding `issues: write` to a workflow that
+holds both signing keys. If a louder channel is ever wanted, the place to look is the existing daily
+channel check, which already posts to Slack.
+
 ### `.github/workflows/premerge.yaml` — the PR gate
 
 Before this workflow existed, `aggregate.yaml` ran only on schedule/dispatch, so a pull request
