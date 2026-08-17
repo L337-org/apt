@@ -142,6 +142,19 @@ expect_output() {
     fi
 }
 
+# Read a file's permission bits on GNU or BSD.
+#
+# GNU form FIRST, which is not arbitrary: BSD stat rejects -c outright and exits non-zero, so it
+# falls through cleanly, whereas GNU stat ACCEPTS -f - there it means "file system status" - and
+# prints "?" for a directive it does not recognise while exiting ZERO. Trying the BSD form first
+# therefore yields "?" on Linux and never reaches the fallback, which is exactly how this
+# assertion passed locally and failed in CI.
+mode_of() {
+    local f=$1 bits
+    bits=$(stat -c '%a' "$f" 2>/dev/null) || bits=$(stat -f '%Lp' "$f" 2>/dev/null) || bits=""
+    printf '%s' "$bits"
+}
+
 expect_true() {
     local name=$1 condition=$2
     if [ "$condition" = true ]; then
@@ -160,9 +173,10 @@ grep -qE '[[:space:]]Release$' "$d/Release" && ok=false || ok=true
 expect_true "no self-entry in the generated Release" "$ok"
 grep -q 'stale Release' "$d/Release" && ok=false || ok=true
 expect_true "previous Release replaced, not hashed" "$ok"
-bits=$(stat -f '%Lp' "$d/Release" 2>/dev/null || stat -c '%a' "$d/Release")
+bits=$(mode_of "$d/Release")
 [ "$bits" = 644 ] && ok=true || ok=false
 expect_true "generated Release is mode 0644" "$ok"
+[ "$ok" = true ] || echo "        stat reported: '$bits'"
 # Assert the whole contents rather than just the absence of a known temporary name: anything
 # unexpected in the served tree would be published, and naming only the current temporary would
 # stop catching a leak the moment that name changed.

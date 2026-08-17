@@ -201,8 +201,14 @@ Two things about its shape are load-bearing:
   where an incremented failure counter is discarded on exit and the suite reports success with a
   broken case inside it. The output goes to a file and the status into a global for that reason.
 
-Mutation-verified: removing the self-entry check, defeating hash verification, and silencing the
-unrecognised-algorithm notice each fail the suite.
+- Reading file modes portably needs the **GNU form first**: `stat -c '%a'` then `stat -f '%Lp'`.
+  BSD `stat` rejects `-c` and exits non-zero, so it falls through cleanly — but GNU `stat`
+  *accepts* `-f` (there it means "file system status") and prints `?` for an unknown directive
+  while **exiting zero**, so a BSD-first fallback silently yields `?` on Linux. That is exactly how
+  the mode assertion passed locally and failed in CI on the first run of this job.
+
+Mutation-verified: removing the self-entry check, defeating hash verification, silencing the
+unrecognised-algorithm notice, and dropping the `chmod` each fail the suite.
 
 ### `scripts/sync-debs.py`
 
