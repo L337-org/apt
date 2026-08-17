@@ -1,0 +1,118 @@
+name: Channel install check
+
+# Installs from the published channel the way a user would, on a clean machine.
+#
+# Everything else that watches this channel inspects it rather than using it: the daily
+# external check verifies expected versions, sizes, hashes and both signatures without ever
+# running an apt client, and premerge's aggregate-dry-run builds an index in a scratch
+# directory without ever installing from the published one. So the property users actually
+# depend on - that a clean machine given only the documented two-line setup can fetch and
+# install what the channel advertises - was the one thing nothing checked. It was answered by
+# hand during the investigation of the Release self-entry bug, which is what prompted this.
+#
+# It lives here rather than in each producing project deliberately: the channel is what is
+# under test, this repo is its single writer, and a copy per producer would be duplicated
+# tests of infrastructure those repos do not control. Upgrade testing is the opposite case and
+# deliberately NOT here - upgrading from the previous release exercises a package's own
+# maintainer scripts, which belong with the code that produces them.
+#
+# No secrets, and no write permission: it only reads a public channel.
+
+on:
+  schedule:
+    # Offset from the daily external channel check so the two do not report at once.
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: channel-install
+  cancel-in-progress: false
+
+jobs:
+  install-from-channel:
+    name: Install on a clean Debian container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install every package the channel advertises
+        # A container rather than the runner itself: the runner already has apt sources,
+        # keyrings and packages of its own, so an install there would not answer the question
+        # asked. debian:stable-slim is as close to a clean machine as this can get cheaply.
+        #
+        # The setup commands are the ones README.md documents. That is a deliberate
+        # duplication of two lines, and it can drift from the README - flagged rather than
+        # solved here, since the alternative (extracting them from the README at run time)
+        # trades a visible duplication for a fragile parser.
+        #
+        # On failure this job simply fails, and GitHub's own workflow-failure notification is
+        # the alert. Filing a deduplicated issue was considered and rejected as unnecessary
+        # given that notification already exists; recorded so it is not re-litigated as an
+        # oversight.
+        run: |
+          docker run --rm --env DEBIAN_FRONTEND=noninteractive debian:stable-slim bash -euo pipefail -c '
+            apt-get update -qq
+            apt-get install -y -qq curl ca-certificates gnupg >/dev/null
+
+            curl -fsSL https://apt.l337.org/l337-apt.gpg -o /usr/share/keyrings/l337-apt.gpg
+            echo "deb [signed-by=/usr/share/keyrings/l337-apt.gpg] https://apt.l337.org/ ./" \
+                > /etc/apt/sources.list.d/l337-apt.list
+
+            # Fetching InRelease and Packages here is the real test of the index: apt verifies
+            # the signature against the keyring and checks Packages against the hashes in
+            # Release, so a bad signature or a wrong hash fails at this line rather than being
+            # reasoned about.
+            #
+            # A clean exit alone proves too little, because apt reports some unusable-repository
+            # conditions as a warning while still exiting zero. So W:/E: lines are treated as
+            # failures - and only those, rather than any stderr output at all, since unrelated
+            # benign chatter on stderr would otherwise fail this job every night for no reason.
+            apt-get update 2>/tmp/update.err || { cat /tmp/update.err >&2; exit 1; }
+            if grep -qE "^(W|E):" /tmp/update.err; then
+              echo "::error::apt-get update reported problems against the channel:" >&2
+              cat /tmp/update.err >&2
+              exit 1
+            fi
+            [ -s /tmp/update.err ] && cat /tmp/update.err >&2 || true
+
+            # Take the package list from what apt itself parsed out of the index, rather than
+            # from a name hardcoded here: this then covers every producing project added to
+            # repos.yaml in future without a second place to update. It also proves apt could
+            # parse the index, not merely fetch it.
+            list=$(ls /var/lib/apt/lists/ | grep "apt.l337.org.*_Packages$" | head -1)
+            if [ -z "$list" ]; then
+              echo "::error::apt kept no Packages list for the channel - nothing was indexed." >&2
+              ls -la /var/lib/apt/lists/ >&2
+              exit 1
+            fi
+            mapfile -t packages < <(awk "/^Package: /{print \$2}" "/var/lib/apt/lists/$list" | sort -u)
+            if [ "${#packages[@]}" -eq 0 ]; then
+              echo "::error::The channel advertises no packages at all." >&2
+              exit 1
+            fi
+            echo "Channel advertises ${#packages[@]} package(s): ${packages[*]}"
+
+            for pkg in "${packages[@]}"; do
+              echo "--- $pkg"
+              apt-cache policy "$pkg"
+
+              candidate=$(apt-cache policy "$pkg" | awk "/Candidate:/{print \$2}")
+              if [ -z "$candidate" ] || [ "$candidate" = "(none)" ]; then
+                echo "::error::$pkg is advertised by the channel but has no installable candidate." >&2
+                exit 1
+              fi
+
+              apt-get install -y -qq "$pkg" >/dev/null
+
+              # The installed version must be the one the channel advertised. This is the check
+              # that catches a channel serving something other than what its index claims -
+              # the class of problem no amount of index inspection can rule out.
+              installed=$(dpkg-query -W -f "\${Version}" "$pkg")
+              if [ "$installed" != "$candidate" ]; then
+                echo "::error::$pkg: channel advertised $candidate, installed $installed." >&2
+                exit 1
+              fi
+              echo "$pkg $installed installed and matches the advertised candidate"
+            done
+          '
