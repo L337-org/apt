@@ -18,8 +18,9 @@ import subprocess
 import sys
 import urllib.request
 
-# Mirrored in repos.yaml's comment: the number of releases kept per repo when an entry does
-# not say. Named once so load_config's validation and select_wanted's use cannot disagree.
+# Applied when an entry omits keep_last_n. Named once so load_config's validation and
+# select_wanted's use of it cannot drift apart; repos.yaml records that the key is optional
+# without repeating the number, so there is nothing there to go stale.
 DEFAULT_KEEP_LAST_N = 5
 
 
@@ -33,7 +34,8 @@ def load_config(path):
     a human edits by hand.
 
     args: path - Path to repos.yaml
-    returns: dict - The parsed configuration, with a "repos" list of {repo, keep_last_n} entries
+    returns: dict - The parsed configuration, with a "repos" list whose entries each carry a
+             repo key and, optionally, keep_last_n
     """
     try:
         import yaml
@@ -63,8 +65,8 @@ def load_config(path):
     repos = config.get("repos")
     if repos is None:
         sys.exit(
-            f"{path} has no repos: key - it must list the projects to aggregate, "
-            f"as {{repo: owner/name, keep_last_n: N}} entries"
+            f"{path} has no repos: key - it must list the projects to aggregate, as "
+            f"{{repo: owner/name}} entries, each optionally setting keep_last_n: N"
         )
     if not isinstance(repos, list):
         sys.exit(f"{path}: repos: must be a list, not a {type(repos).__name__}")

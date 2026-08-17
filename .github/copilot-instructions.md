@@ -284,7 +284,8 @@ fails if it's widened. Verified by mutation: removing the Release comparison fai
 
 ### `repos.yaml`
 
-The only mutable config: a list of `{repo, keep_last_n}` entries, one per producing project.
+The only mutable config: a list of entries, one per producing project, each naming a `repo` and
+optionally setting `keep_last_n` (a default applies when it is omitted).
 Adding a project here (after it attaches a `.deb` to its own releases) is the entire onboarding
 step — no code change required.
 

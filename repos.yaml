@@ -1,6 +1,13 @@
 # Projects whose GitHub Releases feed the APT repo. The aggregator takes the
 # newest keep_last_n releases that carry a .deb asset from each; older versions
 # remain available on each project's Releases page.
+#
+# keep_last_n is optional - omit it and the default in scripts/sync-debs.py
+# applies. The number is deliberately not repeated here, so there is nothing in
+# this file to go stale if it changes. It must be a whole number, 1 or more.
+#
+# Add an entry only once the project has published a .deb: a repo that yields
+# none makes every run refuse rather than prune, which is intentional.
 repos:
   - repo: L337-org/send-to-influx
     keep_last_n: 5
