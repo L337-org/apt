@@ -20,17 +20,43 @@ import urllib.request
 
 
 def load_config(path):
-    """Load the repo list.
+    """Load and validate the repo list.
+
+    The shape is checked here rather than trusted downstream, because every malformed shape
+    otherwise surfaces as a traceback naming a Python type instead of the file at fault. An
+    empty file parses as None, a top-level list parses as a list, and an entry without a repo
+    key raises KeyError - three different tracebacks for what is one kind of mistake, in a file
+    a human edits by hand.
 
     args: path - Path to repos.yaml
-    returns: dict - The parsed configuration, with a "repos" list
+    returns: dict - The parsed configuration, with a "repos" list of {repo, keep_last_n} entries
     """
     try:
         import yaml
     except ImportError:
         sys.exit("PyYAML missing on runner - install python3-yaml in this step")
     with open(path) as handle:
-        return yaml.safe_load(handle)
+        config = yaml.safe_load(handle)
+
+    if config is None:
+        sys.exit(f"{path} is empty - it must contain a repos: list")
+    if not isinstance(config, dict):
+        sys.exit(
+            f"{path} must contain a mapping with a repos: key, "
+            f"but its top level is a {type(config).__name__}"
+        )
+
+    repos = config.get("repos")
+    if repos is not None and not isinstance(repos, list):
+        sys.exit(f"{path}: repos: must be a list, not a {type(repos).__name__}")
+    for position, entry in enumerate(repos or [], start=1):
+        if not isinstance(entry, dict) or not entry.get("repo"):
+            sys.exit(
+                f"{path}: entry {position} under repos: has no repo key naming an "
+                f"owner/name - got {entry!r}"
+            )
+
+    return config
 
 
 def releases_for(repo):

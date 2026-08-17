@@ -158,6 +158,34 @@ run_sync "$d"
 expect_status "repos.yaml lists no repos" 1
 expect_output "  message blames the config, not the API" 'repos\.yaml lists no repos'
 
+# 5b. A malformed repos.yaml must be reported against the file, not raised as a traceback naming
+#     a Python type. An empty file parses as None, a top-level list parses as a list, and an
+#     entry without a repo key raises KeyError - three tracebacks for one kind of hand-editing
+#     mistake, in the one file a human is expected to edit.
+d=$(new_case)
+: > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repos.yaml is empty" 1
+expect_output "  message names the file, not a Python type" 'repos\.yaml is empty'
+grep -q Traceback "$OUT" && ok=false || ok=true
+expect_true "  no traceback" "$ok"
+
+d=$(new_case)
+printf -- '- just\n- a list\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repos.yaml top level is a list" 1
+expect_output "  message says what the top level should be" 'must contain a mapping with a repos: key'
+grep -q Traceback "$OUT" && ok=false || ok=true
+expect_true "  no traceback" "$ok"
+
+d=$(new_case)
+printf 'repos:\n  - keep_last_n: 5\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repos entry has no repo key" 1
+expect_output "  message names the offending entry position" 'entry 1 under repos: has no repo key'
+grep -q Traceback "$OUT" && ok=false || ok=true
+expect_true "  no traceback" "$ok"
+
 # 6. gh exiting non-zero must name the repo and quote gh's own message, not raise a traceback.
 d=$(new_case)
 printf 'repos:\n  - repo: org/alpha\n' > "$d/repos.yaml"
