@@ -151,12 +151,22 @@ run_sync "$d"
 expect_status "API returned no releases at all" 1
 expect_output "  counts show zero releases, not just zero selected" 'returned 0 release\(s\), 0 with \.deb'
 
-# 5. repos.yaml listing no repos is a config mistake here, and must read differently again.
+# 5. repos.yaml listing no repos is a config mistake here, and must read differently again. An
+#    empty list and a missing key are reported separately: one is "you removed the last entry",
+#    the other is "this file is not shaped the way it should be".
 d=$(new_case)
 printf 'repos: []\n' > "$d/repos.yaml"
 run_sync "$d"
 expect_status "repos.yaml lists no repos" 1
-expect_output "  message blames the config, not the API" 'repos\.yaml lists no repos'
+expect_output "  message blames the config, not the API" 'repos: is empty, so nothing can be selected'
+
+d=$(new_case)
+printf 'keep_last_n: 5\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repos.yaml has no repos: key" 1
+expect_output "  message says the key is missing, not that the list is empty" 'has no repos: key'
+grep -q Traceback "$OUT" && ok=false || ok=true
+expect_true "  no traceback" "$ok"
 
 # 5b. A malformed repos.yaml must be reported against the file, not raised as a traceback naming
 #     a Python type. An empty file parses as None, a top-level list parses as a list, and an

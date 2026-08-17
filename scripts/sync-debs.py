@@ -47,9 +47,19 @@ def load_config(path):
         )
 
     repos = config.get("repos")
-    if repos is not None and not isinstance(repos, list):
+    if repos is None:
+        sys.exit(
+            f"{path} has no repos: key - it must list the projects to aggregate, "
+            f"as {{repo: owner/name, keep_last_n: N}} entries"
+        )
+    if not isinstance(repos, list):
         sys.exit(f"{path}: repos: must be a list, not a {type(repos).__name__}")
-    for position, entry in enumerate(repos or [], start=1):
+    if not repos:
+        sys.exit(
+            f"{path}: repos: is empty, so nothing can be selected - refusing, because "
+            f"pruning against an empty selection would empty the published channel"
+        )
+    for position, entry in enumerate(repos, start=1):
         if not isinstance(entry, dict) or not entry.get("repo"):
             sys.exit(
                 f"{path}: entry {position} under repos: has no repo key naming an "
@@ -104,17 +114,15 @@ def select_wanted(config):
     the producing project), and a repos.yaml listing no repos (a mistake here). Distinguishing
     them costs one number and saves guessing which of the three has happened.
 
-    args: config - The parsed repos.yaml contents
+    The shape of config is guaranteed by load_config, which is the one place repos.yaml is
+    validated - so this iterates it directly rather than re-checking, and a caller building a
+    config by hand is expected to satisfy the same contract.
+
+    args: config - The parsed repos.yaml contents, already validated by load_config
     returns: tuple - (wanted, empty) where wanted maps .deb filename to its browser download
              URL, and empty lists the repos that yielded no .deb assets at all
     """
-    repos = config.get("repos") or []
-    if not repos:
-        sys.exit(
-            "repos.yaml lists no repos, so nothing can be selected - refusing, because "
-            "pruning against an empty selection would empty the published channel"
-        )
-
+    repos = config["repos"]
     wanted = {}
     empty = []
     for entry in repos:
