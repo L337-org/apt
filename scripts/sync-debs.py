@@ -33,19 +33,68 @@ def load_config(path):
         return yaml.safe_load(handle)
 
 
+def releases_for(repo):
+    """Fetch a repo's releases, newest first.
+
+    Wrapped rather than calling subprocess.check_output directly so that a non-zero exit from
+    gh produces an error naming the repo and quoting gh's own message, instead of a bare
+    CalledProcessError traceback that says neither. An API failure was previously less
+    diagnosable than a successful-but-empty response, which is the wrong way round.
+
+    Cross-checking a second endpoint (/releases/latest, or the releases atom feed) to tell "the
+    list endpoint returned an empty array despite releases existing" from "this repo genuinely
+    has no releases" was considered and rejected. Both were observed answering correctly while
+    the list endpoint returned an empty array, so it would have identified the real cause during
+    the incident that prompted this. It is not done because it adds a second network call and a
+    hint that can itself be wrong, while the release counts printed by select_wanted already
+    make the situation legible to a human. Revisit if that turns out not to be enough.
+
+    args: repo - The owner/name of the repo to query
+    returns: list - The parsed releases, newest first
+    """
+    result = subprocess.run(
+        ["gh", "api", f"repos/{repo}/releases?per_page=100"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        sys.exit(
+            f"gh api failed for {repo}, exit {result.returncode}: "
+            f"{result.stderr.strip() or '(gh wrote nothing to stderr)'}"
+        )
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        sys.exit(f"gh api returned unparseable JSON for {repo}: {exc}")
+
+
 def select_wanted(config):
     """Resolve the configured repos to the set of .deb assets that should be served.
 
+    Reports the release count alongside the selected count, because three very different
+    situations otherwise produce the same output: an API returning nothing (an upstream fault,
+    or a genuinely empty repo), releases that carry no .deb asset (a broken release workflow in
+    the producing project), and a repos.yaml listing no repos (a mistake here). Distinguishing
+    them costs one number and saves guessing which of the three has happened.
+
     args: config - The parsed repos.yaml contents
-    returns: dict - Mapping of .deb filename to its browser download URL
+    returns: tuple - (wanted, empty) where wanted maps .deb filename to its browser download
+             URL, and empty lists the repos that yielded no .deb assets at all
     """
+    repos = config.get("repos") or []
+    if not repos:
+        sys.exit(
+            "repos.yaml lists no repos, so nothing can be selected - refusing, because "
+            "pruning against an empty selection would empty the published channel"
+        )
+
     wanted = {}
-    for entry in config["repos"]:
+    empty = []
+    for entry in repos:
         repo = entry["repo"]
         keep = int(entry.get("keep_last_n", 5))
-        releases = json.loads(
-            subprocess.check_output(["gh", "api", f"repos/{repo}/releases?per_page=100"])
-        )
+        releases = releases_for(repo)
         with_debs = 0
         for release in releases:  # newest first
             debs = [a for a in release["assets"] if a["name"].endswith(".deb")]
@@ -56,8 +105,13 @@ def select_wanted(config):
             with_debs += 1
             if with_debs >= keep:
                 break
-        print(f"{repo}: {with_debs} releases with .deb assets selected")
-    return wanted
+        print(
+            f"{repo}: API returned {len(releases)} release(s), "
+            f"{with_debs} with .deb assets selected"
+        )
+        if with_debs == 0:
+            empty.append(repo)
+    return wanted, empty
 
 
 def sync(wanted, dest):
@@ -106,12 +160,31 @@ def main():
     if not os.path.isdir(args.dest):
         sys.exit(f"destination is not a directory: {args.dest}")
 
-    wanted = select_wanted(load_config(args.repos_config))
-    if not wanted:
-        # Without this, a successful-but-empty release listing would prune every .deb in
-        # the published repo, taking the whole APT channel offline. Refuse instead: an
-        # empty result is always either a config mistake or an upstream anomaly.
-        sys.exit("no .deb assets selected from any source repo - refusing to prune the destination")
+    wanted, empty = select_wanted(load_config(args.repos_config))
+
+    # Refuse if ANY configured repo came back with nothing, not only if every one did.
+    #
+    # The check used to be global (`if not wanted`), which is the same thing while exactly one
+    # repo is configured and silently stops being safe the moment a second is added: repo A
+    # returning nothing while repo B is healthy leaves `wanted` non-empty, so the guard would
+    # not fire and every one of A's .deb files would be pruned and pushed as a normal publish.
+    # An empty result is always a config mistake or an upstream anomaly, never a legitimate
+    # instruction to delete a project's packages.
+    #
+    # This was not hypothetical: during a GitHub incident the releases list endpoint returned
+    # HTTP 200 with an empty array intermittently - roughly one call in eight succeeded - so a
+    # single unlucky call, rather than a sustained outage, is enough to hit it.
+    #
+    # The trade-off, deliberately taken: a repo added to repos.yaml before it has published a
+    # .deb blocks every run until it does. That is the documented onboarding order anyway
+    # (attach the .deb first, then add the entry), it fails loudly naming the repo, and the
+    # alternative is pruning someone's packages on a transient API fault.
+    if empty:
+        have = [f for f in os.listdir(args.dest) if f.endswith(".deb")]
+        sys.exit(
+            f"no .deb assets selected from {', '.join(empty)} - refusing to prune the "
+            f"destination, which currently holds {len(have)} .deb file(s)"
+        )
 
     sync(wanted, args.dest)
 
