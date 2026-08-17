@@ -196,6 +196,53 @@ expect_output "  message names the offending entry position" 'entry 1 under repo
 grep -q Traceback "$OUT" && ok=false || ok=true
 expect_true "  no traceback" "$ok"
 
+# 5c. keep_last_n is hand-edited too, so its shape gets the same treatment. A non-integer used to
+#     reach int() and raise ValueError, and anything below 1 was accepted while behaving as 1,
+#     because the selection loop breaks on `with_debs >= keep` after adding a release.
+d=$(new_case)
+printf 'repos:\n  - repo: org/alpha\n    keep_last_n: five\n' > "$d/repos.yaml"
+release_with_deb alpha 1.0 "$d/payload.deb" > "$d/fixtures/org_alpha.json"
+run_sync "$d"
+expect_status "keep_last_n is not a number" 1
+expect_output "  message names the entry and the value" "keep_last_n='five'"
+grep -q Traceback "$OUT" && ok=false || ok=true
+expect_true "  no traceback" "$ok"
+
+d=$(new_case)
+printf 'repos:\n  - repo: org/alpha\n    keep_last_n: 0\n' > "$d/repos.yaml"
+release_with_deb alpha 1.0 "$d/payload.deb" > "$d/fixtures/org_alpha.json"
+run_sync "$d"
+expect_status "keep_last_n is zero" 1
+expect_output "  rejected rather than silently treated as one" 'must be a whole number of releases, 1 or more'
+
+d=$(new_case)
+printf 'repos:\n  - repo: org/alpha\n    keep_last_n: true\n' > "$d/repos.yaml"
+release_with_deb alpha 1.0 "$d/payload.deb" > "$d/fixtures/org_alpha.json"
+run_sync "$d"
+expect_status "keep_last_n is a boolean" 1
+expect_output "  a bool is not a count, despite isinstance(True, int)" 'keep_last_n=True'
+
+# 5d. And the positive case: keep_last_n must actually limit the selection. Nothing tested that
+#     the window works at all, only what happens when it is malformed.
+d=$(new_case)
+printf 'repos:\n  - repo: org/alpha\n    keep_last_n: 2\n' > "$d/repos.yaml"
+python3 - "$d" <<'PY' > "$d/fixtures/org_alpha.json"
+import sys
+d = sys.argv[1]
+url = f"file://{d}/payload.deb"
+print("[" + ",".join(
+    '{"assets":[{"name":"alpha_%s_all.deb","browser_download_url":"%s"}]}' % (v, url)
+    for v in ("3.0", "2.0", "1.0")
+) + "]")
+PY
+run_sync "$d"
+expect_status "keep_last_n limits the window" 0
+expect_output "  only the newest two of three were selected" 'returned 3 release\(s\), 2 with \.deb'
+[ -s "$d/dest/alpha_3.0_all.deb" ] && [ -s "$d/dest/alpha_2.0_all.deb" ] && ok=true || ok=false
+expect_true "  the newest two were fetched" "$ok"
+[ -e "$d/dest/alpha_1.0_all.deb" ] && ok=false || ok=true
+expect_true "  the third was left outside the window" "$ok"
+
 # 6. gh exiting non-zero must name the repo and quote gh's own message, not raise a traceback.
 d=$(new_case)
 printf 'repos:\n  - repo: org/alpha\n' > "$d/repos.yaml"

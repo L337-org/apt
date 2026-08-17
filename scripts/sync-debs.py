@@ -18,6 +18,10 @@ import subprocess
 import sys
 import urllib.request
 
+# Mirrored in repos.yaml's comment: the number of releases kept per repo when an entry does
+# not say. Named once so load_config's validation and select_wanted's use cannot disagree.
+DEFAULT_KEEP_LAST_N = 5
+
 
 def load_config(path):
     """Load and validate the repo list.
@@ -64,6 +68,18 @@ def load_config(path):
             sys.exit(
                 f"{path}: entry {position} under repos: has no repo key naming an "
                 f"owner/name - got {entry!r}"
+            )
+        # keep_last_n was cast with int() at the point of use, so a hand-edited "five" raised a
+        # ValueError - the same traceback-instead-of-message this validation exists to remove.
+        # A bool is rejected explicitly because isinstance(True, int) is True in Python, and
+        # `keep_last_n: true` is not a count. Below 1 is rejected rather than tolerated: the
+        # selection loop breaks on `with_debs >= keep` AFTER adding a release, so 0 silently
+        # selected one, which is not what anyone writing 0 could have meant.
+        keep = entry.get("keep_last_n", DEFAULT_KEEP_LAST_N)
+        if isinstance(keep, bool) or not isinstance(keep, int) or keep < 1:
+            sys.exit(
+                f"{path}: entry {position} ({entry['repo']}) has keep_last_n={keep!r} - "
+                f"it must be a whole number of releases, 1 or more"
             )
 
     return config
@@ -127,7 +143,7 @@ def select_wanted(config):
     empty = []
     for entry in repos:
         repo = entry["repo"]
-        keep = int(entry.get("keep_last_n", 5))
+        keep = entry.get("keep_last_n", DEFAULT_KEEP_LAST_N)  # validated by load_config
         releases = releases_for(repo)
         with_debs = 0
         for release in releases:  # newest first
