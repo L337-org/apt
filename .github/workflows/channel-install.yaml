@@ -121,6 +121,19 @@ jobs:
                 exit 1
               fi
 
+              # Having a candidate is not enough: it must be OUR candidate. If a package name
+              # collides with one in Debian, or pinning changes, apt could satisfy the install
+              # from elsewhere and this job would pass while never touching the channel - a
+              # false pass, which is worse than a false failure because nobody investigates it.
+              # --print-uris says exactly what apt would fetch, before anything is fetched.
+              uris=$(apt-get install --print-uris -y "$pkg" 2>/dev/null || true)
+              if ! printf %s "$uris" | grep -F "apt.l337.org" | grep -qF "/${pkg}_"; then
+                echo "::error::$pkg would not be fetched from the channel - apt resolved it" \
+                     "somewhere else, so this run would not have exercised the channel." >&2
+                printf %s "$uris" | grep -F "/${pkg}_" >&2 || echo "  (no URI for $pkg at all)" >&2
+                exit 1
+              fi
+
               apt-get install -y -qq "$pkg" >/dev/null
 
               # The installed version must be the one the channel advertised. This is the check
