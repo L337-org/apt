@@ -39,8 +39,18 @@ def load_config(path):
         import yaml
     except ImportError:
         sys.exit("PyYAML missing on runner - install python3-yaml in this step")
-    with open(path) as handle:
-        config = yaml.safe_load(handle)
+    # Reading and parsing are wrapped for the same reason the shape checks below exist: a
+    # traceback is never the intended output for a mistake in a hand-edited config file. A YAML
+    # syntax error is the likeliest of the lot - an indentation slip or a stray bracket - and
+    # PyYAML's own message already carries the line and column, so it is quoted rather than
+    # summarised.
+    try:
+        with open(path) as handle:
+            config = yaml.safe_load(handle)
+    except OSError as exc:
+        sys.exit(f"cannot read {path}: {exc.strerror or exc}")
+    except yaml.YAMLError as exc:
+        sys.exit(f"{path} is not valid YAML:\n{exc}")
 
     if config is None:
         sys.exit(f"{path} is empty - it must contain a repos: list")

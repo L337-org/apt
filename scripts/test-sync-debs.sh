@@ -196,6 +196,35 @@ expect_output "  message names the offending entry position" 'entry 1 under repo
 grep -q Traceback "$OUT" && ok=false || ok=true
 expect_true "  no traceback" "$ok"
 
+# 5a. Invalid YAML is the likeliest hand-editing mistake of all - an indentation slip or a stray
+#     bracket - and it reaches the parser before any shape check can run, so it needs its own
+#     handling or the whole validation effort regresses to a stack trace at the first typo.
+d=$(new_case)
+printf 'repos: [unclosed\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repos.yaml is not valid YAML" 1
+expect_output "  message names the file as the problem" 'is not valid YAML'
+expect_output "  PyYAML's line and column are quoted, not summarised" 'line [0-9]+, column [0-9]+'
+grep -q Traceback "$OUT" && ok=false || ok=true
+expect_true "  no traceback" "$ok"
+
+# 5a2. An unreadable or absent config file is the same class: the path is known, so say so.
+d=$(new_case)
+run_sync_missing() {
+    set +e
+    FIXTURES="$1/fixtures" PATH="$STUBS:$PATH" \
+        python3 "$SYNC" --repos-config "$1/does-not-exist.yaml" --dest "$1/dest" \
+        > "$1/out" 2>&1
+    RUN_STATUS=$?
+    set -e
+    OUT="$1/out"
+}
+run_sync_missing "$d"
+expect_status "repos.yaml does not exist" 1
+expect_output "  message names the file and why it could not be read" 'cannot read .*does-not-exist\.yaml'
+grep -q Traceback "$OUT" && ok=false || ok=true
+expect_true "  no traceback" "$ok"
+
 # 5c. keep_last_n is hand-edited too, so its shape gets the same treatment. A non-integer used to
 #     reach int() and raise ValueError, and anything below 1 was accepted while behaving as 1,
 #     because the selection loop breaks on `with_debs >= keep` after adding a release.
