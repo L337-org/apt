@@ -76,27 +76,25 @@ jobs:
             fi
             [ -s /tmp/update.err ] && cat /tmp/update.err >&2 || true
 
-            # Take the package list from what apt itself parsed out of the index, rather than
-            # from a name hardcoded here: this then covers every producing project added to
-            # repos.yaml in future without a second place to update. It also proves apt could
-            # parse the index, not merely fetch it.
-            # A glob loop rather than `list=$(ls | grep ...)`: under `set -e` with pipefail, a
-            # grep that matches nothing exits 1, which fails the assignment and kills the script
-            # BEFORE the emptiness check below - so the diagnostic would never print and the job
-            # would fail with no output at all. A glob also matches the dots in the hostname
-            # literally, which the regex did not.
-            list=""
-            for candidate_list in /var/lib/apt/lists/*apt.l337.org*_Packages; do
-              [ -e "$candidate_list" ] || continue
-              list=$candidate_list
-              break
-            done
-            if [ -z "$list" ]; then
-              echo "::error::apt kept no Packages list for the channel - nothing was indexed." >&2
-              ls -la /var/lib/apt/lists/ >&2
-              exit 1
-            fi
-            mapfile -t packages < <(awk "/^Package: /{print \$2}" "$list" | sort -u)
+            # Take the package list from the channel index over HTTP, so every producing project
+            # added to repos.yaml in future is covered without a second place to update here.
+            #
+            # Deliberately NOT read out of /var/lib/apt/lists. apt promises no storage format
+            # for its lists, and in this very image it does not use the obvious one: Debian
+            # container images ship /etc/apt/apt.conf.d/docker-gzip-indexes setting
+            # Acquire::GzipIndexes "true", so the stored file is Packages.lz4, and a glob for the
+            # uncompressed name matches nothing - failing the job while blaming the channel for a
+            # bug in the checker. `apt-get indextargets` filtered on "Site:" was tried as the
+            # replacement and returns nothing in this image either, so the apt-internal route was
+            # abandoned for the source of truth. Both were verified in a container rather than
+            # reasoned about.
+            #
+            # Nothing is lost by not reading the copy apt keeps: the apt-get update above already
+            # proved apt fetched and verified this index, and the apt-cache policy check below
+            # fails for any package apt did not take from it.
+            mapfile -t packages < <(
+              curl -fsSL https://apt.l337.org/Packages | awk "/^Package: /{print \$2}" | sort -u
+            )
             if [ "${#packages[@]}" -eq 0 ]; then
               echo "::error::The channel advertises no packages at all." >&2
               exit 1
