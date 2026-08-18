@@ -76,7 +76,15 @@ def load_config(path):
             f"pruning against an empty selection would empty the published channel"
         )
     for position, entry in enumerate(repos, start=1):
-        if not isinstance(entry, dict) or not entry.get("repo"):
+        # Three distinct mistakes, three distinct messages. Collapsing them into one truthiness
+        # test reported "has no repo key" for `repo: false` and `repo: 0`, where the key is
+        # plainly present with a wrong value - and it short-circuited the shape check below, so
+        # the more specific message could never be reached for exactly the values that needed it.
+        if not isinstance(entry, dict):
+            sys.exit(
+                f"{path}: entry {position} under repos: is not a mapping - got {entry!r}"
+            )
+        if "repo" not in entry:
             sys.exit(
                 f"{path}: entry {position} under repos: has no repo key naming an "
                 f"owner/name - got {entry!r}"

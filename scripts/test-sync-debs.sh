@@ -238,6 +238,34 @@ expect_output "  reported against the file, not as a 404" 'has repo=123 - it mus
 grep -q 'gh api failed' "$OUT" && ok=false || ok=true
 expect_true "  gh was never called" "$ok"
 
+# A present-but-falsy repo must not be reported as a missing key: the key is there with a wrong
+# value, and a truthiness test both misdescribes it and skips the shape check that would say so.
+d=$(new_case)
+printf 'repos:\n  - repo: false\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repo is present but false" 1
+expect_output "  described as a bad value, not a missing key" 'has repo=False'
+grep -q 'has no repo key' "$OUT" && ok=false || ok=true
+expect_true "  not misreported as a missing key" "$ok"
+
+d=$(new_case)
+printf 'repos:\n  - repo: null\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repo is present but null" 1
+expect_output "  described as a bad value" 'has repo=None'
+
+d=$(new_case)
+printf 'repos:\n  - just a string\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "entry is not a mapping" 1
+expect_output "  says the entry is not a mapping" 'is not a mapping'
+
+d=$(new_case)
+printf 'repos:\n  - keep_last_n: 3\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "entry omits repo entirely" 1
+expect_output "  and this one really is a missing key" 'has no repo key'
+
 d=$(new_case)
 printf 'repos:\n  - repo: owner/name/extra\n' > "$d/repos.yaml"
 run_sync "$d"
