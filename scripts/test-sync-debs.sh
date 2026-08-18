@@ -325,6 +325,24 @@ expect_true "  the newest two were fetched" "$ok"
 [ -e "$d/dest/alpha_1.0_all.deb" ] && ok=false || ok=true
 expect_true "  the third was left outside the window" "$ok"
 
+# 5e. Two repos publishing the same .deb filename must refuse, naming both. The destination is a
+#     flat directory, so it can serve only one file of that name: the previous behaviour let the
+#     later repo win silently, publishing one project's package under a name another project also
+#     claimed, decided by the order of repos.yaml and by what was already on disk. A run that
+#     succeeds while serving the wrong project's package is worse than one that fails.
+d=$(new_case)
+printf 'repos:\n  - repo: org/alpha\n  - repo: org/beta\n' > "$d/repos.yaml"
+printf 'from ALPHA\n' > "$d/alpha-payload.deb"
+printf 'from BETA\n' > "$d/beta-payload.deb"
+release_with_deb common 1.0 "$d/alpha-payload.deb" > "$d/fixtures/org_alpha.json"
+release_with_deb common 1.0 "$d/beta-payload.deb" > "$d/fixtures/org_beta.json"
+run_sync "$d"
+expect_status "two repos claim the same .deb filename" 1
+expect_output "  refusal names both repos" 'published by both org/alpha and org/beta'
+expect_output "  refusal names the file" 'common_1\.0_all\.deb is published by both'
+[ -e "$d/dest/common_1.0_all.deb" ] && ok=false || ok=true
+expect_true "  nothing was published under the contested name" "$ok"
+
 # 6. gh exiting non-zero must name the repo and quote gh's own message, not raise a traceback.
 d=$(new_case)
 printf 'repos:\n  - repo: org/alpha\n' > "$d/repos.yaml"

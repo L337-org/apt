@@ -180,6 +180,7 @@ def select_wanted(config):
     """
     repos = config["repos"]
     wanted = {}
+    claimed_by = {}  # .deb filename -> the repo that published it, for collision detection
     empty = []
     for entry in repos:
         repo = entry["repo"]
@@ -191,7 +192,22 @@ def select_wanted(config):
             if not debs:
                 continue
             for asset in debs:
-                wanted[asset["name"]] = asset["browser_download_url"]
+                name = asset["name"]
+                # The destination is a flat directory, so two repos publishing the same .deb
+                # filename cannot both be served - and the previous behaviour was to let the
+                # later one win silently, publishing one project's package under a name another
+                # project also claims. Which one users got depended on the order of repos.yaml
+                # and on what happened to be on disk already, with nothing in the output saying
+                # so. There is no correct choice to make here, so refuse and name both.
+                claimant = claimed_by.get(name)
+                if claimant is not None and claimant != repo:
+                    sys.exit(
+                        f"{name} is published by both {claimant} and {repo} - the channel is a "
+                        f"flat directory and can serve only one file of that name, so there is "
+                        f"no way to choose. Rename the package in one of them."
+                    )
+                claimed_by[name] = repo
+                wanted[name] = asset["browser_download_url"]
             with_debs += 1
             if with_debs >= keep:
                 break
