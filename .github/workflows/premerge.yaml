@@ -93,7 +93,15 @@ jobs:
 
           missing = []
           for path in sorted(pathlib.Path(".github/workflows").glob("*.y*ml")):
-              document = yaml.safe_load(path.read_text())
+              # `or {}` because safe_load returns None for an empty or comment-only file, and a
+              # traceback is never the right output for a guard - the same mistake this repo
+              # already fixed in sync-debs.py, repeated here and caught in review.
+              try:
+                  document = yaml.safe_load(path.read_text()) or {}
+              except yaml.YAMLError as exc:
+                  print(f"::error::{path.name} is not valid YAML, so its jobs cannot be checked:")
+                  print(f"  {exc}")
+                  sys.exit(1)
               for name, job in (document.get("jobs") or {}).items():
                   if "timeout-minutes" not in job:
                       missing.append(f"{path.name}: {name}")
