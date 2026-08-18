@@ -64,6 +64,19 @@ jobs:
           fi
           echo "All action references are pinned to commit SHAs."
 
+      - name: Install PyYAML
+        # Declared rather than assumed. PyYAML happens to be present on today's ubuntu-latest, and
+        # the guard below passed on it, but this repo's convention is to name what it needs instead
+        # of relying on whatever the image preinstalls - the same reason sync-guard and
+        # aggregate-dry-run install it explicitly. A guard that works by luck of the image is a
+        # guard that stops working on an image refresh, silently, since a missing import would fail
+        # the job rather than skip the check - but on a schedule nobody chose.
+        #
+        # This makes a fourth job run apt-get install, which is where the hang that prompted this
+        # change happened. That is acceptable precisely because of this change: the timeout added
+        # here bounds it to 15 minutes instead of six hours.
+        run: sudo apt-get update && sudo apt-get install -y python3-yaml
+
       - name: Every job must declare a timeout
         # Same shape as the pin guard above, and in this job rather than a new one so it needs no
         # new required check. Without a timeout a job inherits GitHub's 6-hour default: a hang in
