@@ -62,10 +62,18 @@ def load_config(path):
             f"but its top level is a {type(config).__name__}"
         )
 
-    repos = config.get("repos")
-    if repos is None:
+    # "absent" and "present but null" are both common hand-edit mistakes and they need different
+    # messages, for the same reason repo: false needed one distinct from a missing repo key: a
+    # message saying the key is missing sends the reader looking for something that is right there.
+    if "repos" not in config:
         sys.exit(
             f"{path} has no repos: key - it must list the projects to aggregate, as "
+            f"{{repo: owner/name}} entries, each optionally setting keep_last_n: N"
+        )
+    repos = config["repos"]
+    if repos is None:
+        sys.exit(
+            f"{path}: repos: is present but empty - it must list the projects to aggregate, as "
             f"{{repo: owner/name}} entries, each optionally setting keep_last_n: N"
         )
     if not isinstance(repos, list):

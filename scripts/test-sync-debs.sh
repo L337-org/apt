@@ -168,6 +168,17 @@ expect_output "  message says the key is missing, not that the list is empty" 'h
 grep -q Traceback "$OUT" && ok=false || ok=true
 expect_true "  no traceback" "$ok"
 
+# repos: null is a different mistake from an absent key, and needs a different message - the same
+# distinction made at entry level for repo: false. Saying a key is missing when it is plainly
+# there sends the reader looking for something that is not the problem.
+d=$(new_case)
+printf 'repos: null\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repos: is present but null" 1
+expect_output "  described as present but empty" 'repos: is present but empty'
+grep -q 'has no repos: key' "$OUT" && ok=false || ok=true
+expect_true "  not misreported as a missing key" "$ok"
+
 # 5b. A malformed repos.yaml must be reported against the file, not raised as a traceback naming
 #     a Python type. An empty file parses as None, a top-level list parses as a list, and an
 #     entry without a repo key raises KeyError - three tracebacks for one kind of hand-editing
