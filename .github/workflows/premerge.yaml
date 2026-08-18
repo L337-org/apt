@@ -88,6 +88,27 @@ jobs:
         # the dry run, which is precisely the gap this closes.
         run: scripts/test-build-index.sh
 
+  sync-guard:
+    name: Sync refuses to prune on an empty result
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install PyYAML
+        # sync-debs.py parses repos.yaml, so the suite needs the same dependency the publishing
+        # job installs. Nothing else: `gh` is stubbed and download URLs are file:// URLs, so the
+        # tests need neither network nor credentials.
+        run: sudo apt-get update && sudo apt-get install -y python3-yaml
+
+      - name: Test sync-debs.py against a stubbed GitHub API
+        # The load-bearing case is multi-repo. The prune guard was global, which is
+        # indistinguishable from a per-repo guard while one repo is configured and silently
+        # unsafe once a second is added - one repo returning nothing would have pruned that
+        # project's packages and pushed it as a normal publish. aggregate-dry-run cannot catch
+        # that, because repos.yaml has a single entry.
+        run: scripts/test-sync-debs.sh
+
   aggregate-dry-run:
     name: Aggregate dry run (no signing, no push)
     runs-on: ubuntu-latest
