@@ -225,6 +225,31 @@ expect_output "  message names the file and why it could not be read" 'cannot re
 grep -q Traceback "$OUT" && ok=false || ok=true
 expect_true "  no traceback" "$ok"
 
+# 5b2. A malformed repo value must be reported as a config mistake, not as an API 404. It never
+#      crashed - it reached gh and returned "Not Found" - but that sends the reader to GitHub to
+#      look for a deleted repo instead of to this file to fix a typo.
+d=$(new_case)
+printf 'repos:\n  - repo: 123\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repo is not a string" 1
+expect_output "  reported against the file, not as a 404" 'has repo=123 - it must be a single owner/name'
+# Deliberately matches only gh's own failure line, not the string "404" - the refusal message
+# itself mentions 404, so a looser pattern matches the very output it is meant to rule out.
+grep -q 'gh api failed' "$OUT" && ok=false || ok=true
+expect_true "  gh was never called" "$ok"
+
+d=$(new_case)
+printf 'repos:\n  - repo: owner/name/extra\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repo has too many slashes" 1
+expect_output "  names the offending value" "repo='owner/name/extra'"
+
+d=$(new_case)
+printf 'repos:\n  - repo: owner /name\n' > "$d/repos.yaml"
+run_sync "$d"
+expect_status "repo contains whitespace" 1
+expect_output "  whitespace is rejected too" "repo='owner /name'"
+
 # 5c. keep_last_n is hand-edited too, so its shape gets the same treatment. A non-integer used to
 #     reach int() and raise ValueError, and anything below 1 was accepted while behaving as 1,
 #     because the selection loop breaks on `with_debs >= keep` after adding a release.

@@ -81,6 +81,26 @@ def load_config(path):
                 f"{path}: entry {position} under repos: has no repo key naming an "
                 f"owner/name - got {entry!r}"
             )
+        # A malformed repo value did not crash - it reached gh and came back as
+        # "gh api failed for 123, exit 1: gh: Not Found (HTTP 404)". No traceback, but it reports
+        # a config mistake as an API failure, and a maintainer reading a 404 reasonably concludes
+        # the repo was deleted or renamed rather than that they mistyped this file.
+        #
+        # The check is deliberately loose: a string, exactly one slash, neither side empty, no
+        # whitespace. It does NOT police the character classes GitHub allows, because a guard
+        # that rejects a legitimate owner/name is worse than the 404 it replaces - that is how a
+        # guard ends up switched off wholesale. Anything that survives this is GitHub's to judge.
+        repo = entry["repo"]
+        if (
+            not isinstance(repo, str)
+            or repo.count("/") != 1
+            or not all(repo.split("/"))
+            or any(character.isspace() for character in repo)
+        ):
+            sys.exit(
+                f"{path}: entry {position} has repo={repo!r} - it must be a single owner/name, "
+                f"so that a mistake here is reported as one rather than as an API 404 later"
+            )
         # keep_last_n was cast with int() at the point of use, so a hand-edited "five" raised a
         # ValueError - the same traceback-instead-of-message this validation exists to remove.
         # A bool is rejected explicitly because isinstance(True, int) is True in Python, and
