@@ -102,7 +102,23 @@ jobs:
                   print(f"::error::{path.name} is not valid YAML, so its jobs cannot be checked:")
                   print(f"  {exc}")
                   sys.exit(1)
-              for name, job in (document.get("jobs") or {}).items():
+              # Shapes are checked before use, for the reason this whole guard exists. A jobs:
+              # list would raise AttributeError, and a job whose value is a STRING is worse than
+              # a crash: `"timeout-minutes" not in job` becomes a substring test that quietly
+              # answers nonsense. GitHub would reject such a workflow anyway, but a guard adding
+              # a traceback beside that rejection makes the real problem harder to see.
+              jobs = document.get("jobs")
+              if jobs is None:
+                  continue
+              if not isinstance(jobs, dict):
+                  print(f"::error::{path.name}: jobs: is a {type(jobs).__name__},"
+                        f" not a mapping of job names - this is not a usable workflow.")
+                  sys.exit(1)
+              for name, job in jobs.items():
+                  if not isinstance(job, dict):
+                      print(f"::error::{path.name}: job {name!r} is a {type(job).__name__},"
+                            f" not a mapping - this is not a usable workflow.")
+                      sys.exit(1)
                   if "timeout-minutes" not in job:
                       missing.append(f"{path.name}: {name}")
 
