@@ -27,6 +27,12 @@ jobs:
   action-pins:
     name: Action pins are immutable
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     steps:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,9 +64,82 @@ jobs:
           fi
           echo "All action references are pinned to commit SHAs."
 
+      - name: Install PyYAML
+        # Declared rather than assumed. PyYAML happens to be present on today's ubuntu-latest, and
+        # the guard below passed on it, but this repo's convention is to name what it needs instead
+        # of relying on whatever the image preinstalls - the same reason sync-guard and
+        # aggregate-dry-run install it explicitly. A guard that works by luck of the image is a
+        # guard that stops working on an image refresh, silently, since a missing import would fail
+        # the job rather than skip the check - but on a schedule nobody chose.
+        #
+        # This makes a fourth job run apt-get install, which is where the hang that prompted this
+        # change happened. That is acceptable precisely because of this change: the timeout added
+        # here bounds it to 15 minutes instead of six hours.
+        run: sudo apt-get update && sudo apt-get install -y python3-yaml
+
+      - name: Every job must declare a timeout
+        # Same shape as the pin guard above, and in this job rather than a new one so it needs no
+        # new required check. Without a timeout a job inherits GitHub's 6-hour default: a hang in
+        # the hourly publisher stalled the channel for six hours and silently cancelled every run
+        # queued behind it, reporting nothing, because a stall is not a failure. Four of these
+        # jobs run apt-get install on the runner, which is where that hang happened, so the
+        # property is enforced rather than remembered.
+        #
+        # Note the job name still says only "Action pins are immutable" - it is a required check
+        # on main, so renaming it would break the ruleset until the new name were added there.
+        run: |
+          python3 - <<'CHECK'
+          import pathlib, sys, yaml
+
+          missing = []
+          for path in sorted(pathlib.Path(".github/workflows").glob("*.y*ml")):
+              # `or {}` because safe_load returns None for an empty or comment-only file, and a
+              # traceback is never the right output for a guard - the same mistake this repo
+              # already fixed in sync-debs.py, repeated here and caught in review.
+              try:
+                  document = yaml.safe_load(path.read_text()) or {}
+              except yaml.YAMLError as exc:
+                  print(f"::error::{path.name} is not valid YAML, so its jobs cannot be checked:")
+                  print(f"  {exc}")
+                  sys.exit(1)
+              # Shapes are checked before use, for the reason this whole guard exists. A jobs:
+              # list would raise AttributeError, and a job whose value is a STRING is worse than
+              # a crash: `"timeout-minutes" not in job` becomes a substring test that quietly
+              # answers nonsense. GitHub would reject such a workflow anyway, but a guard adding
+              # a traceback beside that rejection makes the real problem harder to see.
+              jobs = document.get("jobs")
+              if jobs is None:
+                  continue
+              if not isinstance(jobs, dict):
+                  print(f"::error::{path.name}: jobs: is a {type(jobs).__name__},"
+                        f" not a mapping of job names - this is not a usable workflow.")
+                  sys.exit(1)
+              for name, job in jobs.items():
+                  if not isinstance(job, dict):
+                      print(f"::error::{path.name}: job {name!r} is a {type(job).__name__},"
+                            f" not a mapping - this is not a usable workflow.")
+                      sys.exit(1)
+                  if "timeout-minutes" not in job:
+                      missing.append(f"{path.name}: {name}")
+
+          if missing:
+              print("::error::Every job must declare timeout-minutes, or it inherits GitHub's"
+                    " 6-hour default and a hang goes unreported.")
+              for entry in missing:
+                  print(f"  {entry}")
+              sys.exit(1)
+          print("Every job declares timeout-minutes.")
+          CHECK
+
   change-detection:
     name: Change detection behaves
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     steps:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -76,6 +155,12 @@ jobs:
   index-guard:
     name: Index guard refuses a malformed Release
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     steps:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,6 +176,12 @@ jobs:
   sync-guard:
     name: Sync refuses to prune on an empty result
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     steps:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -112,6 +203,12 @@ jobs:
   aggregate-dry-run:
     name: Aggregate dry run (no signing, no push)
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
