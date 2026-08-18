@@ -67,7 +67,17 @@ required status checks on `main`'s ruleset:
   unless it names a 40-hex commit SHA. This workflow imports both signing keys, so a mutable
   tag/branch ref on a third-party action is a real supply-chain risk here, not a style nit; local
   actions (`./...`) are exempt, and Dependabot bumps the SHA (rewriting the trailing `# vX.Y.Z`
-  comment) so pinning doesn't mean going stale.
+  comment) so pinning doesn't mean going stale. The **same job** also asserts that every job in
+  every workflow declares `timeout-minutes` — without one a job inherits GitHub's **6-hour**
+  default. That is not theoretical: a hang in `Install apt repo tooling` stalled the hourly
+  publisher for six hours and, because `cancel-in-progress: false` keeps one pending run per
+  group, silently **cancelled every run queued behind it** while reporting nothing, since a stall
+  is not a failure. Four jobs run `apt-get install` on the runner, which is where that hang
+  happened. Every job is set to **15 minutes** against a normal runtime under 40 seconds: enough
+  headroom that it cannot fire on a slow-but-working run, and a timeout registers as a **failure**,
+  so it produces the workflow-failure notification a stall never did. The check lives in this job
+  rather than a new one because the job name is a required check on `main` and a new one would need
+  adding to the ruleset — which is also why the name still mentions only pins.
 - **`change-detection`**: runs `scripts/test-detect-changes.sh` against synthetic fixtures.
 - **`sync-guard`**: runs `scripts/test-sync-debs.sh` against a stubbed `gh`. Covers what
   `aggregate-dry-run` structurally cannot: `repos.yaml` has one entry, so no dry run can exercise

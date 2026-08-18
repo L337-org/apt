@@ -35,6 +35,12 @@ jobs:
   install-from-channel:
     name: Install on a clean Debian container
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     steps:
       - name: Install every package the channel advertises
         # A container rather than the runner itself: the runner already has apt sources,

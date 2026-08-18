@@ -27,6 +27,12 @@ jobs:
   action-pins:
     name: Action pins are immutable
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     steps:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,9 +64,45 @@ jobs:
           fi
           echo "All action references are pinned to commit SHAs."
 
+      - name: Every job must declare a timeout
+        # Same shape as the pin guard above, and in this job rather than a new one so it needs no
+        # new required check. Without a timeout a job inherits GitHub's 6-hour default: a hang in
+        # the hourly publisher stalled the channel for six hours and silently cancelled every run
+        # queued behind it, reporting nothing, because a stall is not a failure. Four of these
+        # jobs run apt-get install on the runner, which is where that hang happened, so the
+        # property is enforced rather than remembered.
+        #
+        # Note the job name still says only "Action pins are immutable" - it is a required check
+        # on main, so renaming it would break the ruleset until the new name were added there.
+        run: |
+          python3 - <<'CHECK'
+          import pathlib, sys, yaml
+
+          missing = []
+          for path in sorted(pathlib.Path(".github/workflows").glob("*.y*ml")):
+              document = yaml.safe_load(path.read_text())
+              for name, job in (document.get("jobs") or {}).items():
+                  if "timeout-minutes" not in job:
+                      missing.append(f"{path.name}: {name}")
+
+          if missing:
+              print("::error::Every job must declare timeout-minutes, or it inherits GitHub's"
+                    " 6-hour default and a hang goes unreported.")
+              for entry in missing:
+                  print(f"  {entry}")
+              sys.exit(1)
+          print("Every job declares timeout-minutes.")
+          CHECK
+
   change-detection:
     name: Change detection behaves
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     steps:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -76,6 +118,12 @@ jobs:
   index-guard:
     name: Index guard refuses a malformed Release
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     steps:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,6 +139,12 @@ jobs:
   sync-guard:
     name: Sync refuses to prune on an empty result
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     steps:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -112,6 +166,12 @@ jobs:
   aggregate-dry-run:
     name: Aggregate dry run (no signing, no push)
     runs-on: ubuntu-latest
+    # 15 minutes against a job that normally finishes in under 40 seconds: enough
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
+    # one skipped cycle. A hang used to sit until GitHub's 6-hour default, and a
+    # timeout registers as a FAILURE, so it produces the workflow-failure notification
+    # that a silent stall never did.
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
