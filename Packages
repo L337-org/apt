@@ -1,26 +1,4 @@
 Package: send-to-influx
-Version: 4.4
-Architecture: all
-Maintainer: Gavin Lucas
-Depends: debconf (>= 0.5), python3 (>= 3.10), python3 (<< 3.31)
-Suggests: mosquitto, mosquitto-clients
-Filename: ./send-to-influx_4.4_all.deb
-Size: 3130906
-MD5sum: 0d84c78bc92762412f8d7351b94df2fc
-SHA1: 1e73a07a2cdee89fc736fd5362911d169cd476da
-SHA256: 188b029d8c9efd2c2f4db12c8d35aa71878d73ff67bc7f6a8ce1084b912a8fef
-Section: utils
-Priority: optional
-Description: Collects data from smart home / energy devices and writes it to InfluxDB
- send-to-influx polls Hue, MyEnergi, Octopus, Open-Meteo, National Grid Carbon
- Intensity, Nuki smart locks (via MQTT) and Speedtest sources and writes the
- results to InfluxDB using the line protocol, for visualisation in Grafana.
- .
- The Nuki source needs an MQTT broker on the local network - mosquitto (and
- mosquitto-clients, for verifying the setup) are suggested rather than
- depended on, since the broker may equally run on a different host.
-
-Package: send-to-influx
 Version: 4.5
 Architecture: all
 Maintainer: Gavin Lucas
@@ -99,6 +77,29 @@ Size: 30635920
 MD5sum: 7dd328b713dabd2f48a43c1e04acc190
 SHA1: 9cde0dab3ef649805d34fac2158e466fe7a1bbc5
 SHA256: 874e3a5d36cc4d12ed46f0e246beebee0727c2e1450b917b0ffa4347cb7822b1
+Section: utils
+Priority: optional
+Description: Collects data from smart home / energy devices and writes it to InfluxDB
+ send-to-influx polls Hue, MyEnergi, Octopus, Open-Meteo, National Grid Carbon
+ Intensity, Nuki smart locks (via MQTT) and Speedtest sources and writes the
+ results to InfluxDB using the line protocol, for visualisation in Grafana.
+ .
+ The Nuki source needs an MQTT broker on the local network - mosquitto (and
+ mosquitto-clients, for verifying the setup) are suggested rather than
+ depended on, since the broker may equally run on a different host.
+
+Package: send-to-influx
+Version: 5.3
+Architecture: all
+Maintainer: Gavin Lucas
+Depends: debconf (>= 0.5), python3 (>= 3.10), python3 (<< 3.31)
+Recommends: rsyslog, logrotate
+Suggests: mosquitto, mosquitto-clients
+Filename: ./send-to-influx_5.3_all.deb
+Size: 30775376
+MD5sum: 40dd6a2746d07d7d4ffee9a8ee1b43ea
+SHA1: 77f215f80bb1437cdaa1c546ca6ccd5333afc09f
+SHA256: fb594b3ac3614acfe25a7fb5beb98f0bf367635df299161f25eb688d129da4fe
 Section: utils
 Priority: optional
 Description: Collects data from smart home / energy devices and writes it to InfluxDB
