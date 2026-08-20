@@ -20,6 +20,21 @@ anywhere in this design** — producing projects never authenticate to this repo
 pushes only to its own `gh-pages` with its own default `GITHUB_TOKEN`. Onboarding a new project is
 just: attach a `.deb` to its GitHub Release, then add one entry to `repos.yaml`.
 
+### The `report-cancelled-as-failure` job (`aggregate.yaml`, `channel-install.yaml`)
+
+One job per scheduled workflow, `needs` the real job, `if: always() && needs.<job>.result ==
+'cancelled'`, and does nothing but emit an error annotation and `exit 1`. Its whole purpose is to
+turn the `cancelled` conclusion a `timeout-minutes` kill produces into a `failure`, so an
+unattended hang notifies and shows up in a failed-run sweep instead of passing unseen.
+
+It is safe in these two workflows **because** both set `cancel-in-progress: false`: nothing
+supersedes them, so the only routes to `cancelled` are the timeout and a human pressing cancel, and
+both deserve a notification on a run nobody is watching. `premerge.yaml` deliberately has **no**
+equivalent — `cancel-in-progress: true` there means a superseded re-push cancels routinely, so the
+guard would fire on ordinary PR activity; a cancelled premerge run also blocks the merge in front
+of a human, which is the notification. Adding it there would need the ruleset updating too, since a
+new job name is not a required check.
+
 ### `.github/workflows/aggregate.yaml` — the publishing run
 
 Runs hourly (`cron: "17 * * * *"`) and on `workflow_dispatch`, with `concurrency.group: aggregate`
@@ -74,8 +89,13 @@ required status checks on `main`'s ruleset:
   group, silently **cancelled every run queued behind it** while reporting nothing, since a stall
   is not a failure. Four jobs run `apt-get install` on the runner, which is where that hang
   happened. Every job is set to **15 minutes** against a normal runtime under 40 seconds: enough
-  headroom that it cannot fire on a slow-but-working run, and a timeout registers as a **failure**,
-  so it produces the workflow-failure notification a stall never did. The check lives in this job
+  headroom that it cannot fire on a slow-but-working run. Be careful about what that buys you: a
+  job killed by `timeout-minutes` reports `conclusion: **cancelled**`, never `failure` and never
+  `timed_out`, so **the timeout alone raises no workflow-failure notification** and is invisible to
+  any tooling sweeping for failed runs. This was confirmed the hard way — the same hang recurred
+  five times in ~16.5 hours in Aug 2026 and every occurrence had to be found by reading the run
+  list by hand. Converting the cancellation into a failure is a separate job, described below, and
+  it exists only in the two scheduled workflows. The check lives in this job
   rather than a new one because the job name is a required check on `main` and a new one would need
   adding to the ruleset — which is also why the name still mentions only pins.
 - **`change-detection`**: runs `scripts/test-detect-changes.sh` against synthetic fixtures.
