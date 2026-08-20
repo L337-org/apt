@@ -28,8 +28,10 @@ jobs:
     name: Action pins are immutable
     runs-on: ubuntu-latest
     # 15 minutes against a job that normally finishes in under 40 seconds: enough
-    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
-    # one skipped cycle. A hang used to sit until GitHub's 6-hour default. A job killed
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hung run
+    # to 15 minutes rather than the 6 hours it would otherwise sit for. Note that this
+    # workflow runs per push and per PR, so unlike the scheduled ones there is no cycle
+    # here for a hang to make it skip - it costs the one run. A job killed
     # by this timeout reports `conclusion: cancelled`, NEVER `failure`, so it raises no
     # workflow-failure notification. That is tolerable here and only here: these runs
     # are attached to a PR, where any non-green result blocks the merge in front of a
@@ -140,8 +142,10 @@ jobs:
     name: Change detection behaves
     runs-on: ubuntu-latest
     # 15 minutes against a job that normally finishes in under 40 seconds: enough
-    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
-    # one skipped cycle. A hang used to sit until GitHub's 6-hour default. A job killed
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hung run
+    # to 15 minutes rather than the 6 hours it would otherwise sit for. Note that this
+    # workflow runs per push and per PR, so unlike the scheduled ones there is no cycle
+    # here for a hang to make it skip - it costs the one run. A job killed
     # by this timeout reports `conclusion: cancelled`, NEVER `failure`, so it raises no
     # workflow-failure notification. That is tolerable here and only here: these runs
     # are attached to a PR, where any non-green result blocks the merge in front of a
@@ -166,8 +170,10 @@ jobs:
     name: Index guard refuses a malformed Release
     runs-on: ubuntu-latest
     # 15 minutes against a job that normally finishes in under 40 seconds: enough
-    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
-    # one skipped cycle. A hang used to sit until GitHub's 6-hour default. A job killed
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hung run
+    # to 15 minutes rather than the 6 hours it would otherwise sit for. Note that this
+    # workflow runs per push and per PR, so unlike the scheduled ones there is no cycle
+    # here for a hang to make it skip - it costs the one run. A job killed
     # by this timeout reports `conclusion: cancelled`, NEVER `failure`, so it raises no
     # workflow-failure notification. That is tolerable here and only here: these runs
     # are attached to a PR, where any non-green result blocks the merge in front of a
@@ -192,8 +198,10 @@ jobs:
     name: Sync refuses to prune on an empty result
     runs-on: ubuntu-latest
     # 15 minutes against a job that normally finishes in under 40 seconds: enough
-    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
-    # one skipped cycle. A hang used to sit until GitHub's 6-hour default. A job killed
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hung run
+    # to 15 minutes rather than the 6 hours it would otherwise sit for. Note that this
+    # workflow runs per push and per PR, so unlike the scheduled ones there is no cycle
+    # here for a hang to make it skip - it costs the one run. A job killed
     # by this timeout reports `conclusion: cancelled`, NEVER `failure`, so it raises no
     # workflow-failure notification. That is tolerable here and only here: these runs
     # are attached to a PR, where any non-green result blocks the merge in front of a
@@ -224,8 +232,10 @@ jobs:
     name: Aggregate dry run (no signing, no push)
     runs-on: ubuntu-latest
     # 15 minutes against a job that normally finishes in under 40 seconds: enough
-    # headroom that it cannot fire on a slow-but-working run, while bounding a hang to
-    # one skipped cycle. A hang used to sit until GitHub's 6-hour default. A job killed
+    # headroom that it cannot fire on a slow-but-working run, while bounding a hung run
+    # to 15 minutes rather than the 6 hours it would otherwise sit for. Note that this
+    # workflow runs per push and per PR, so unlike the scheduled ones there is no cycle
+    # here for a hang to make it skip - it costs the one run. A job killed
     # by this timeout reports `conclusion: cancelled`, NEVER `failure`, so it raises no
     # workflow-failure notification. That is tolerable here and only here: these runs
     # are attached to a PR, where any non-green result blocks the merge in front of a
