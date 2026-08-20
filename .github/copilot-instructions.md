@@ -94,8 +94,9 @@ required status checks on `main`'s ruleset:
   `timed_out`, so **the timeout alone raises no workflow-failure notification** and is invisible to
   any tooling sweeping for failed runs. This was confirmed the hard way — the same hang recurred
   five times in ~16.5 hours in Aug 2026 and every occurrence had to be found by reading the run
-  list by hand. Converting the cancellation into a failure is a separate job, described below, and
-  it exists only in the two scheduled workflows. The check lives in this job
+  list by hand. Converting the cancellation into a failure is a separate job,
+  `report-cancelled-as-failure`, described near the top of this document, and it exists only in the
+  two scheduled workflows. The check lives in this job
   rather than a new one because the job name is a required check on `main` and a new one would need
   adding to the ruleset — which is also why the name still mentions only pins.
 - **`change-detection`**: runs `scripts/test-detect-changes.sh` against synthetic fixtures.
