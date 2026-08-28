@@ -58,7 +58,7 @@ channel check, which already posts to Slack.
 
 Before this workflow existed, `aggregate.yaml` ran only on schedule/dispatch, so a pull request
 (a Dependabot action bump, in particular) carried no status checks at all - a bump that broke
-publishing would only surface on the next hourly run against the real `gh-pages`. Three jobs, all
+publishing would only surface on the next hourly run against the real `gh-pages`. Five jobs, all
 required status checks on `main`'s ruleset:
 
 - **`action-pins`**: greps every `uses:` in `.github/workflows` and `.github/actions` and fails

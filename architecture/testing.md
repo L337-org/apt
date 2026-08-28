@@ -13,7 +13,7 @@ wants correct, so the well-formed case has to genuinely agree with the tree rath
 coincidence. `md5sum`/`sha*sum` are shimmed **only if missing** (macOS), so a Linux run uses the
 real binaries.
 
-Two things about its shape are load-bearing:
+Three things about its shape are load-bearing:
 
 - Cases assert **what the failure says**, not only that it happened. Removing the self-entry check
   from the guard still produces a non-zero exit (the size check catches it incidentally), so only
