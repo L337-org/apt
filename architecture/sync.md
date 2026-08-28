@@ -13,11 +13,11 @@ so a failed/partial download can't leave the destination already missing what wa
 pruned.
 
 **The prune guard is per-repo, and that distinction is the whole point.** `main()` refuses if **any**
-configured repo came back with no `.deb` assets — not only if every one did. The check used to be
+configured repo came back with no `.deb` assets - not only if every one did. The check used to be
 global (`if not wanted`), which is the same thing while exactly one repo is configured and silently
 stops being safe the moment a second is added: repo A returning nothing while repo B is healthy
 leaves `wanted` non-empty, so the guard wouldn't fire and **every one of A's `.deb` files would be
-pruned and pushed as a normal publish**. Not hypothetical — during a GitHub incident the releases
+pruned and pushed as a normal publish**. Not hypothetical - during a GitHub incident the releases
 list endpoint returned `200` with an empty array intermittently (roughly one call in eight
 succeeded), so a single unlucky call suffices. `scripts/test-sync-debs.sh` pins it; reverting to the
 global form makes that suite delete a fixture `.deb`, which is the defect in miniature.
@@ -36,6 +36,6 @@ verbatim, rather than raising a `CalledProcessError` traceback that identifies n
 
 Rejected, and recorded in `releases_for()`'s docstring so it isn't re-proposed: cross-checking
 `/releases/latest` or the atom feed to distinguish "the list endpoint lied" from "genuinely empty".
-Both were observed answering correctly during the incident, so it would have worked — but it adds a
+Both were observed answering correctly during the incident, so it would have worked - but it adds a
 second network call and a hint that can itself mislead, and the counts already make the situation
 legible.

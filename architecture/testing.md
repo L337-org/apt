@@ -23,7 +23,7 @@ Two things about its shape are load-bearing:
   broken case inside it. The output goes to a file and the status into a global for that reason.
 
 - Reading file modes portably needs the **GNU form first**: `stat -c '%a'` then `stat -f '%Lp'`.
-  BSD `stat` rejects `-c` and exits non-zero, so it falls through cleanly — but GNU `stat`
+  BSD `stat` rejects `-c` and exits non-zero, so it falls through cleanly - but GNU `stat`
   *accepts* `-f` (there it means "file system status") and prints `?` for an unknown directive
   while **exiting zero**, so a BSD-first fallback silently yields `?` on Linux. That is exactly how
   the mode assertion passed locally and failed in CI on the first run of this job.
@@ -33,23 +33,23 @@ unrecognised-algorithm notice, and dropping the `chmod` each fail the suite.
 
 ### `scripts/test-sync-debs.sh`
 
-Stubs `gh` on `PATH` and uses `file://` download URLs, so it needs no network and no credentials —
+Stubs `gh` on `PATH` and uses `file://` download URLs, so it needs no network and no credentials  - 
 only python3 with PyYAML. Seven cases: one repo empty while another is healthy (**the load-bearing
-one** — a global guard passes this while deleting files), every repo empty, releases without a
+one** - a global guard passes this while deleting files), every repo empty, releases without a
 `.deb`, an empty API reply, a `repos.yaml` with no repos, `gh` exiting non-zero, and the happy path
 still fetching and pruning so the guard hasn't become a blanket refusal. Run by the `sync-guard`
 premerge job.
 
 ### `scripts/test-detect-changes.sh`
 
-Exercises `detect-changes.sh` against synthetic, hand-built git repos — no `dpkg`/`gnupg` needed,
+Exercises `detect-changes.sh` against synthetic, hand-built git repos - no `dpkg`/`gnupg` needed,
 so it runs anywhere including a developer machine. The "must NOT publish" cases (Release
 `Date:`-only churn, a Release `Packages.gz`-entry-only change, reordered-but-identical `Packages`)
 are the load-bearing ones: a detector that can't say "no" would sign and push an unchanged repo
 every hour forever, and one that can't say "yes" is how an index-generation change went
 unpublished in the first place (the original incident this script and `premerge.yaml` both exist
-to catch). The Release cases pair up deliberately — `Date:`-only and `Packages.gz`-entry-only must
-be ignored, a real checksum entry changing and a self-entry disappearing must publish — so each of
+to catch). The Release cases pair up deliberately - `Date:`-only and `Packages.gz`-entry-only must
+be ignored, a real checksum entry changing and a self-entry disappearing must publish - so each of
 the two filters in `release_signal()` has a test that fails if it's dropped **and** a test that
 fails if it's widened. Verified by mutation: removing the Release comparison fails exactly the two
 "must publish" cases, and dropping the `Packages.gz` filter fails exactly the `Packages.gz` one.
