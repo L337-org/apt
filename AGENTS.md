@@ -19,7 +19,7 @@ are not optional background.
 
 `apt` owns the flat APT (Debian package) repository served at <https://apt.l337.org/> — the
 `gh-pages` branch, published via GitHub Pages with a custom domain (`templates/CNAME`). It has no
-application code: one scheduled workflow, a small Python/Bash `scripts/` set, a `repos.yaml`
+application code: scheduled workflows, a small Python/Bash `scripts/` set, a `repos.yaml`
 config listing which org repos contribute packages, and the static files (`templates/`) copied
 into the published branch. It exists so every L337-org project that ships a `.deb` can be
 installed from one `apt` source line instead of each project running its own repository
@@ -59,9 +59,9 @@ at all.
 
 ## Conventions
 
-- No unit test framework — `scripts/test-detect-changes.sh` and `scripts/test-build-index.sh` are
-  the tests, run directly by `premerge.yaml`, not through a runner. Both need only bash and (for
-  the first) git, so both run on a developer machine unchanged.
+- No unit test framework - the `scripts/test-*.sh` set is the tests, run directly by
+  `premerge.yaml`, not through a runner. They need bash, plus git for `test-detect-changes.sh`
+  and python3 with PyYAML for `test-sync-debs.sh`, so they run on a developer machine unchanged.
 - Every third-party GitHub Action `uses:` must be pinned to a 40-hex commit SHA (`action-pins`
   job enforces it); Dependabot (`.github/dependabot.yml`, weekly, grouped into one PR) bumps the
   SHA and its trailing `# vX.Y.Z` comment.
