@@ -83,6 +83,6 @@ of `aggregate.yaml` exists to publish.
 Copied verbatim onto `gh-pages` every run: `CNAME` (the custom domain), `.nojekyll` (disables
 GitHub Pages' Jekyll processing, which would otherwise mangle the flat repo layout), `index.html`
 (the landing page at the domain root), `README.md` (the *published* branch's own README, warning
-against hand-editing since the next run overwrites it), and the two public keyring files  - 
+against hand-editing since the next run overwrites it), and the two public keyring files -
 `l337-apt.gpg` (current name) and `send-to-influx.gpg` (the identical key under its historical
 name, kept so pre-existing installs referencing it never need to re-fetch).

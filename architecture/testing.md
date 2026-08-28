@@ -33,7 +33,7 @@ unrecognised-algorithm notice, and dropping the `chmod` each fail the suite.
 
 ### `scripts/test-sync-debs.sh`
 
-Stubs `gh` on `PATH` and uses `file://` download URLs, so it needs no network and no credentials  - 
+Stubs `gh` on `PATH` and uses `file://` download URLs, so it needs no network and no credentials -
 only python3 with PyYAML. Seven cases: one repo empty while another is healthy (**the load-bearing
 one** - a global guard passes this while deleting files), every repo empty, releases without a
 `.deb`, an empty API reply, a `repos.yaml` with no repos, `gh` exiting non-zero, and the happy path
