@@ -25,6 +25,72 @@ concurrency:
 
 jobs:
 
+  ruff-run:
+    # CS.3.1 wants lint and format-check on every pull request, both required. ruff does both,
+    # and carries the pydocstyle rules CS.6.12's Google docstring format needs - see ruff.toml
+    # for why the vendored hygiene script is excluded from those.
+    runs-on: [ubuntu-latest]
+    name: Run ruff
+    # 2s observed - two Python files.
+    timeout-minutes: 5
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python environment
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        # From requirements-dev.txt rather than named here, so a developer runs the same
+        # versions CI does and a bump is a reviewed change to that file (CS.3.2, DS.2.1).
+        run: pip install -r requirements-dev.txt
+
+      - name: Run ruff lint
+        run: ruff check .
+
+      - name: Run ruff format check
+        run: ruff format --check .
+
+  mypy-run:
+    # The type half of CS.3.1, a separate job from ruff so a lint failure and a type failure
+    # are distinguishable at a glance rather than both reading as "Run ruff".
+    runs-on: [ubuntu-latest]
+    name: Run mypy
+    # 5s observed. Roomier than that: mypy builds a cache on a cold run.
+    timeout-minutes: 10
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python environment
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run mypy
+        run: mypy scripts/
+
+  shellcheck-run:
+    # Shell is the larger half of this repository's code - the index build, the change
+    # detection and their test harnesses - so linting only the Python would leave most of it
+    # ungated. shellcheck is preinstalled on the runner image, so there is nothing to pin.
+    runs-on: [ubuntu-latest]
+    name: Run shellcheck
+    # 1s observed over five scripts.
+    timeout-minutes: 5
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run shellcheck
+        run: shellcheck scripts/*.sh
+
+
   repo-hygiene:
     # Conventions every repository in this organisation shares, checked by a script that is
     # byte-identical in each of them and verifies itself against a recorded digest. Editing one

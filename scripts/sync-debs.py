@@ -14,8 +14,10 @@ can drift away from what actually publishes.
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 
 # Applied when an entry omits keep_last_n. Named once so load_config's validation and
@@ -33,9 +35,12 @@ def load_config(path):
     key raises KeyError - three different tracebacks for what is one kind of mistake, in a file
     a human edits by hand.
 
-    args: path - Path to repos.yaml
-    returns: dict - The parsed configuration, with a "repos" list whose entries each carry a
-             repo key and, optionally, keep_last_n
+    Args:
+        path (str): Path to repos.yaml.
+
+    Returns:
+        dict: The parsed configuration, with a "repos" list whose entries each carry a repo
+        key and, optionally, keep_last_n.
     """
     try:
         import yaml
@@ -57,10 +62,7 @@ def load_config(path):
     if config is None:
         sys.exit(f"{path} is empty - it must contain a repos: list")
     if not isinstance(config, dict):
-        sys.exit(
-            f"{path} must contain a mapping with a repos: key, "
-            f"but its top level is a {type(config).__name__}"
-        )
+        sys.exit(f"{path} must contain a mapping with a repos: key, but its top level is a {type(config).__name__}")
 
     # "absent" and "present but null" are both common hand-edit mistakes and they need different
     # messages, for the same reason repo: false needed one distinct from a missing repo key: a
@@ -89,14 +91,9 @@ def load_config(path):
         # plainly present with a wrong value - and it short-circuited the shape check below, so
         # the more specific message could never be reached for exactly the values that needed it.
         if not isinstance(entry, dict):
-            sys.exit(
-                f"{path}: entry {position} under repos: is not a mapping - got {entry!r}"
-            )
+            sys.exit(f"{path}: entry {position} under repos: is not a mapping - got {entry!r}")
         if "repo" not in entry:
-            sys.exit(
-                f"{path}: entry {position} under repos: has no repo key naming an "
-                f"owner/name - got {entry!r}"
-            )
+            sys.exit(f"{path}: entry {position} under repos: has no repo key naming an owner/name - got {entry!r}")
         # A malformed repo value did not crash - it reached gh and came back as
         # "gh api failed for 123, exit 1: gh: Not Found (HTTP 404)". No traceback, but it reports
         # a config mistake as an API failure, and a maintainer reading a 404 reasonably concludes
@@ -149,14 +146,24 @@ def releases_for(repo):
     hint that can itself be wrong, while the release counts printed by select_wanted already
     make the situation legible to a human. Revisit if that turns out not to be enough.
 
-    args: repo - The owner/name of the repo to query
-    returns: list - The parsed releases, newest first
+    Args:
+        repo (str): The owner/name of the repo to query.
+
+    Returns:
+        list: The parsed releases, newest first.
     """
-    result = subprocess.run(
-        ["gh", "api", f"repos/{repo}/releases?per_page=100"],
+    # Resolved by lookup rather than relying on PATH order: gh's location differs per runner
+    # image and per install method (SU.6.3). The timeout is explicit because a call without one
+    # hangs rather than failing, and this one runs once per configured repo (SU.6.4).
+    gh = shutil.which("gh")
+    if not gh:
+        sys.exit("gh is not on PATH, so releases cannot be listed")
+    result = subprocess.run(  # noqa: S603 - fixed argument list, no shell, repo comes from repos.yaml
+        [gh, "api", f"repos/{repo}/releases?per_page=100"],
         capture_output=True,
         text=True,
         check=False,
+        timeout=120,
     )
     if result.returncode != 0:
         sys.exit(
@@ -182,9 +189,12 @@ def select_wanted(config):
     validated - so this iterates it directly rather than re-checking, and a caller building a
     config by hand is expected to satisfy the same contract.
 
-    args: config - The parsed repos.yaml contents, already validated by load_config
-    returns: tuple - (wanted, empty) where wanted maps .deb filename to its browser download
-             URL, and empty lists the repos that yielded no .deb assets at all
+    Args:
+        config (dict): The parsed repos.yaml contents, already validated by load_config.
+
+    Returns:
+        tuple: (wanted, empty), where wanted maps .deb filename to its browser download URL
+        and empty lists the repos that yielded no .deb assets at all.
     """
     repos = config["repos"]
     wanted = {}
@@ -219,21 +229,56 @@ def select_wanted(config):
             with_debs += 1
             if with_debs >= keep:
                 break
-        print(
-            f"{repo}: API returned {len(releases)} release(s), "
-            f"{with_debs} with .deb assets selected"
-        )
+        print(f"{repo}: API returned {len(releases)} release(s), {with_debs} with .deb assets selected")
         if with_debs == 0:
             empty.append(repo)
     return wanted, empty
 
 
-def sync(wanted, dest):
+def download(url, destination, allow_file_urls=False):
+    """Fetch one asset to a path, refusing a URL that did not come from where it should have.
+
+    The URL arrives in a GitHub API response body rather than from configuration here, so it is
+    checked against the origin it should have come from before being followed (SU.3.9). Without
+    that, a compromised or malformed response could name `file:///etc/passwd` and this would
+    copy it. Redirects are still followed - GitHub serves release assets from a separate object
+    host - because the rule is about who chose the destination, not about staying on one host.
+
+    Args:
+        url (str): The asset's download URL, as GitHub reported it.
+        destination (str): Path to write to.
+        allow_file_urls (bool): Permit a file:// URL as well. Off by default and only for the
+            offline test suite, which serves fixture payloads from a temporary directory. What
+            it costs when on: a download URL in an API response can name any path this process
+            can read, and its contents get published into the archive.
+
+    Raises:
+        SystemExit: If the URL is not permitted by the rules above.
+    """
+    parsed = urllib.parse.urlparse(url)
+    if allow_file_urls and parsed.scheme == "file":
+        shutil.copyfile(parsed.path, destination)
+        return
+    # Exactly github.com, not any subdomain of it: browser_download_url is always
+    # https://github.com/<owner>/<repo>/releases/download/..., so a wider rule would admit hosts
+    # this never legitimately sees (SU.1.3). The redirect to GitHub's object host is followed
+    # normally - the rule is about the URL we were handed, not about where it leads.
+    if parsed.scheme != "https" or parsed.hostname != "github.com":
+        sys.exit(f"refusing to fetch {url!r}: expected an https URL on github.com")
+    # Timeout is explicit for the same reason as the gh call: a hung fetch would otherwise
+    # stall the whole sync with no signal (SU.3.4).
+    with urllib.request.urlopen(url, timeout=300) as response:  # noqa: S310 - scheme and host checked above
+        with open(destination, "wb") as handle:
+            shutil.copyfileobj(response, handle)
+
+
+def sync(wanted, dest, allow_file_urls=False):
     """Make dest hold exactly the wanted .deb files, fetching and pruning as needed.
 
-    args: wanted - Mapping of filename to download URL, as returned by select_wanted
-    args: dest - Existing directory to bring into line with wanted
-    returns: None
+    Args:
+        wanted (dict): Mapping of filename to download URL, as returned by select_wanted.
+        dest (str): Existing directory to bring into line with wanted.
+        allow_file_urls (bool): Passed through to download; see there.
     """
     have = {f for f in os.listdir(dest) if f.endswith(".deb")}
 
@@ -250,7 +295,7 @@ def sync(wanted, dest):
         final = os.path.join(dest, name)
         partial = f"{final}.part"
         try:
-            urllib.request.urlretrieve(url, partial)
+            download(url, partial, allow_file_urls)
             os.replace(partial, final)  # atomic within one filesystem
         finally:
             if os.path.exists(partial):
@@ -262,14 +307,25 @@ def sync(wanted, dest):
 
 
 def main():
-    """Parse arguments and sync the destination directory.
-
-    returns: None
-    """
+    """Parse arguments and sync the destination directory."""
     parser = argparse.ArgumentParser(description="Sync .deb release assets into a flat directory.")
     parser.add_argument("--repos-config", required=True, help="path to repos.yaml")
     parser.add_argument("--dest", required=True, help="directory to sync into (must exist)")
+    parser.add_argument(
+        "--allow-file-urls",
+        action="store_true",
+        help="also accept file:// download URLs (offline test suite only, never in CI or production)",
+    )
     args = parser.parse_args()
+
+    # A relaxation that is on says so, so a run can be audited from its own output rather than
+    # by reconstructing how it was invoked (SU.1.4).
+    if args.allow_file_urls:
+        print(
+            "WARNING: --allow-file-urls is set, so a download URL naming any readable local "
+            "path will be copied into the archive. This is for the offline test suite only.",
+            file=sys.stderr,
+        )
 
     if not os.path.isdir(args.dest):
         sys.exit(f"destination is not a directory: {args.dest}")
@@ -300,7 +356,7 @@ def main():
             f"destination, which currently holds {len(have)} .deb file(s)"
         )
 
-    sync(wanted, args.dest)
+    sync(wanted, args.dest, args.allow_file_urls)
 
 
 if __name__ == "__main__":

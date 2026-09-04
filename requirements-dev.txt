@@ -1,0 +1,9 @@
+# Development tooling, pinned here rather than named in a CI step so a developer runs the same
+# versions CI does and a bump is a reviewed change to this file (CS.3.2, DS.2.1).
+#
+# There is no runtime requirements file: sync-debs.py imports only the standard library plus
+# PyYAML, which CI installs as the distribution's python3-yaml because this repository builds
+# Debian archives and uses the system Python throughout.
+ruff==0.15.4
+mypy==1.19.0
+types-PyYAML==6.0.12.20250915

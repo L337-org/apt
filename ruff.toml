@@ -1,0 +1,23 @@
+# Lint and format for this repository's Python. CS.3.1 requires lint, format-check and
+# type-check on every pull request, all required; ruff covers the first two and mypy the third.
+# The shell scripts are covered separately by shellcheck, which is the larger half of this
+# repository's code.
+line-length = 120
+target-version = "py312"
+
+[lint]
+# E/F pycodestyle and pyflakes, B flake8-bugbear, S flake8-bandit, UP pyupgrade, D pydocstyle.
+select = ["E", "F", "B", "S", "UP", "D"]
+
+[lint.pydocstyle]
+# CS.6.12: for Python the docstring format is Google style, enforced here rather than by review.
+convention = "google"
+
+[lint.per-file-ignores]
+# The vendored hygiene script is byte-identical in four repositories and its docstring format is
+# settled by the repository that owns it, not by this one. It is written in that repository's
+# documented lowercase `args:`/`returns:` house style, which is not Google, so D405 fires on
+# every section. Excluded rather than converted, because converting it means changing all four
+# copies and the digest they share - work that belongs with the gate deciding the format.
+# Remove this entry when that lands.
+"scripts/check-repo-hygiene.py" = ["D"]

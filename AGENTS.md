@@ -70,6 +70,24 @@ at all.
   quirks) — read them before changing behaviour, and extend them rather than paraphrasing when
   editing nearby code.
 
+## Python and shell style
+
+`scripts/*.py` is linted and formatted by `ruff` and type-checked by `mypy`; `scripts/*.sh` is
+linted by `shellcheck`. All four are required checks. `ruff.toml` holds the configuration and
+`requirements-dev.txt` pins the versions, so what you run locally is what CI runs. shellcheck is
+preinstalled on the runner image and so is not pinned.
+
+**Docstrings are Google style** - `Args:` and `Returns:` sections, capitalised, with the type in
+the entry because this code carries no annotations. `ruff`'s pydocstyle rules enforce it.
+`scripts/check-repo-hygiene.py` is excluded: it is vendored byte-identically into four
+repositories and its format is settled by the repository that owns it.
+
+**`sync-debs.py` will not follow a download URL that is not an https github.com one**, because
+that URL arrives in an API response body rather than from configuration here. `--allow-file-urls`
+relaxes that for the offline test suite only, and says so at WARNING when it is set. Do not use
+it in CI or in production: with it on, a download URL naming any readable local path gets
+published into the archive.
+
 <!-- BEGIN GENERATED -->
 ## Read these when they apply
 
