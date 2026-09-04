@@ -67,7 +67,7 @@ run_sync() {
     local dir=$1
     set +e
     FIXTURES="$dir/fixtures" PATH="$STUBS:$PATH" \
-        python3 "$SYNC" --repos-config "$dir/repos.yaml" --dest "$dir/dest" \
+        python3 "$SYNC" --repos-config "$dir/repos.yaml" --dest "$dir/dest" --allow-file-urls \
         > "$dir/out" 2>&1
     RUN_STATUS=$?
     set -e
