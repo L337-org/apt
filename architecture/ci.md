@@ -58,15 +58,21 @@ channel check, which already posts to Slack.
 
 Before this workflow existed, `aggregate.yaml` ran only on schedule/dispatch, so a pull request
 (a Dependabot action bump, in particular) carried no status checks at all - a bump that broke
-publishing would only surface on the next hourly run against the real `gh-pages`. Five jobs, all
+publishing would only surface on the next hourly run against the real `gh-pages`. Six jobs, all
 required status checks on `main`'s ruleset:
 
 - **`action-pins`**: greps every `uses:` in `.github/workflows` and `.github/actions` and fails
   unless it names a 40-hex commit SHA. This workflow imports both signing keys, so a mutable
   tag/branch ref on a third-party action is a real supply-chain risk here, not a style nit; local
   actions (`./...`) are exempt, and Dependabot bumps the SHA (rewriting the trailing `# vX.Y.Z`
-  comment) so pinning doesn't mean going stale. The **same job** also asserts that every job in
-  every workflow declares `timeout-minutes` - without one a job inherits GitHub's **6-hour**
+  comment) so pinning doesn't mean going stale.
+- **`repo-hygiene`**: runs `scripts/check-repo-hygiene.py`, vendored byte-identically into every
+  repository in the organisation and checking what they all share - no tracker keys or internal
+  Atlassian links in a public repository, every CI job declaring a timeout **and** that timeout
+  being a usable bound, and the instruction layer routing to its detail files in both directions.
+  The timeout half used to live inside `action-pins` here; keeping both would be two guards
+  checking one thing and drifting the first time either was edited, which is the divergence this
+  vendoring exists to avoid. Without a timeout a job inherits GitHub's **6-hour**
   default. That is not theoretical: a hang in `Install apt repo tooling` stalled the hourly
   publisher for six hours and, because `cancel-in-progress: false` keeps one pending run per
   group, silently **cancelled every run queued behind it** while reporting nothing, since a stall
