@@ -259,10 +259,12 @@ def download(url, destination, allow_file_urls=False):
     if allow_file_urls and parsed.scheme == "file":
         shutil.copyfile(parsed.path, destination)
         return
-    if parsed.scheme != "https" or not (
-        parsed.hostname == "github.com" or (parsed.hostname or "").endswith(".github.com")
-    ):
-        sys.exit(f"refusing to fetch {url!r}: expected an https URL on a github.com host")
+    # Exactly github.com, not any subdomain of it: browser_download_url is always
+    # https://github.com/<owner>/<repo>/releases/download/..., so a wider rule would admit hosts
+    # this never legitimately sees (SU.1.3). The redirect to GitHub's object host is followed
+    # normally - the rule is about the URL we were handed, not about where it leads.
+    if parsed.scheme != "https" or parsed.hostname != "github.com":
+        sys.exit(f"refusing to fetch {url!r}: expected an https URL on github.com")
     # Timeout is explicit for the same reason as the gh call: a hung fetch would otherwise
     # stall the whole sync with no signal (SU.3.4).
     with urllib.request.urlopen(url, timeout=300) as response:  # noqa: S310 - scheme and host checked above
