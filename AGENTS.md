@@ -78,10 +78,12 @@ linted by `shellcheck`. All four are required checks. `ruff.toml` holds the conf
 preinstalled on the runner image and so is not pinned.
 
 **Docstrings are Google style** - `Args:` and `Returns:` sections, capitalised, with the type in
-the entry because this code carries no annotations. `ruff`'s pydocstyle rules enforce it,
-including for `scripts/check-repo-hygiene.py`, which is vendored byte-identically into four
-repositories: a change to it has to land in all four at once, with the digest they share
-regenerated, or its own self-check refuses to run.
+the entry because this code carries no annotations. `ruff`'s pydocstyle rules enforce it.
+
+`scripts/check-repo-hygiene.py` is held to those rules too, but not to the type-in-the-entry
+part: it is vendored byte-identically into four repositories whose local conventions differ, so
+it carries what all four can agree on. A change to it lands in all four at once with the shared
+digest regenerated, or its own self-check refuses to run.
 
 **`sync-debs.py` will not follow a download URL that is not an https github.com one**, because
 that URL arrives in an API response body rather than from configuration here. `--allow-file-urls`
