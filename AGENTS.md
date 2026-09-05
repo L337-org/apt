@@ -79,8 +79,11 @@ preinstalled on the runner image and so is not pinned.
 
 **Docstrings are Google style** - `Args:` and `Returns:` sections, capitalised, with the type in
 the entry because this code carries no annotations. `ruff`'s pydocstyle rules enforce it.
-`scripts/check-repo-hygiene.py` is excluded: it is vendored byte-identically into four
-repositories and its format is settled by the repository that owns it.
+
+`scripts/check-repo-hygiene.py` is held to those rules too, but not to the type-in-the-entry
+part: it is vendored byte-identically into four repositories whose local conventions differ, so
+it carries what all four can agree on. A change to it lands in all four at once with the shared
+digest regenerated, or its own self-check refuses to run.
 
 **`sync-debs.py` will not follow a download URL that is not an https github.com one**, because
 that URL arrives in an API response body rather than from configuration here. `--allow-file-urls`
