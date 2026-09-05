@@ -27,8 +27,7 @@ jobs:
 
   ruff-run:
     # CS.3.1 wants lint and format-check on every pull request, both required. ruff does both,
-    # and carries the pydocstyle rules CS.6.12's Google docstring format needs - see ruff.toml
-    # for why the vendored hygiene script is excluded from those.
+    # and carries the pydocstyle rules CS.6.12's Google docstring format needs.
     runs-on: [ubuntu-latest]
     name: Run ruff
     # 2s observed - two Python files.
