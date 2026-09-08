@@ -139,18 +139,13 @@ from them; and the package list is fetched from the published index over HTTP ra
 back out of apt's own lists, so it covers future producers automatically but says nothing about a
 producer whose packages never reached the index at all.
 
-Both fetches from the channel - the signing key and the index - go through one helper that
-retries three times with a short backoff and fails only when all three attempts fail. A single
-refused connection is not a finding: the runner egress and the published channel are both remote
-and both occasionally unreachable for a few seconds, and failing the run on one of those reports
-a blip as a broken channel, which trains whoever reads it to ignore the alert. Only the transport
-is retried; every check after a successful fetch is about what the channel served, and retrying
-those would hide the faults this job exists to catch. `apt-get update` is deliberately not
-wrapped - both observed failures were at the `curl` stage, and apt has its own retry
-configuration that has not been tested here.
+Both fetches from the channel, the signing key and the index, go through one helper that uses
+curl's own retry (`--retry 2 --retry-connrefused`). Do not change it to `--retry-all-errors`: that
+retries a 404, and a missing index must fail at once rather than a minute later. A resolver
+failure is consequently not retried, which is accepted. Keep `-S --no-progress-meter` rather than
+`-s`, or the per-attempt retry warnings vanish. Retry the transport only - every check after a
+successful fetch is about what the channel served.
 
-A failure to reach the channel is also reported as a different finding from an index that parses
-to no packages: the two send whoever reads the log to different places, one to whether the
-channel is being served at all and the other to what was published. They were once the same
-message, so a run that could not connect said the channel advertised no packages, on days when
-it was serving them perfectly well.
+Failure to reach the channel, an HTTP error from it, and an index that parses to no packages are
+three separate messages. They were once one, so a run that could not connect reported the channel
+as advertising no packages.

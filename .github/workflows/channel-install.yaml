@@ -64,45 +64,34 @@ jobs:
             apt-get update -qq
             apt-get install -y -qq curl ca-certificates gnupg >/dev/null
 
-            # Every fetch from the channel goes through here. A single refused connection is not
-            # a finding: the runner egress and the published channel are both remote, both are
-            # occasionally unreachable for a few seconds, and a check that fails the whole run on
-            # one of those reports a blip as a broken channel - which is worse than useless,
-            # because it trains whoever reads it to ignore the alert. Three attempts with a short
-            # backoff, each logged, failing only when all three fail: a real outage still fails
-            # the run, a blip costs three lines in the log. The transport is what is being
-            # tolerated, so the retry wraps the fetch and nothing further - every check after a
-            # successful fetch is about what the channel served, and retrying those would hide
-            # exactly the faults this job exists to catch.
+            # Both fetches from the channel go through here so the flags cannot drift apart.
             #
-            # Written with explicit `if` blocks rather than `&&` lists: under `set -e` a failing
-            # test as the last command of an `&&` list terminates the script, which would turn
-            # "attempt 1 of 3 failed" into an immediate exit and silently undo the retry.
+            # The retry comes from curl rather than a shell loop: what counts as transient varies
+            # by curl build and protocol - a 404 under -f exits 56 on one version and 22 on
+            # another - so an exit-code table here would be silently wrong somewhere.
+            #
+            # --retry-connrefused is required: --retry alone covers only timeouts and 408/429/5xx,
+            # not the refused connections this check failed on. NOT --retry-all-errors, which
+            # retries a 404 as well, and a missing index must surface at once rather than a minute
+            # later. The accepted cost is that a resolver failure is not retried either.
+            #
+            # -S --no-progress-meter rather than -s, which would mute the per-attempt retry
+            # warnings - the only record that a fetch was flaky rather than clean.
             fetch_from_channel() {
-              url="$1"
-              dest="$2"
-              attempt=1
-              while :; do
-                status=0
-                curl -fsSL --max-time 30 "$url" -o "$dest" || status=$?
-                if [ "$status" -eq 0 ]; then
-                  return 0
-                fi
-                echo "attempt $attempt of 3 fetching $url failed: curl exited $status" >&2
-                if [ "$attempt" -ge 3 ]; then
-                  return "$status"
-                fi
-                attempt=$((attempt + 1))
-                sleep $((attempt * 5))
-              done
+              curl -fSL --no-progress-meter --max-time 30 \
+                   --retry 2 --retry-connrefused --retry-delay 5 --retry-max-time 90 \
+                   "$1" -o "$2"
             }
 
-            if ! fetch_from_channel https://apt.l337.org/l337-apt.gpg /usr/share/keyrings/l337-apt.gpg; then
+            key_status=0
+            fetch_from_channel https://apt.l337.org/l337-apt.gpg /usr/share/keyrings/l337-apt.gpg \
+              || key_status=$?
+            if [ "$key_status" -ne 0 ]; then
               echo "::error::Could not fetch the channel signing key from" \
-                   "https://apt.l337.org/l337-apt.gpg after three attempts. The channel was" \
-                   "unreachable from this runner, which is NOT the same as the key being wrong or" \
-                   "unpublished: check the channel is being served before reading this as a" \
-                   "publishing failure." >&2
+                   "https://apt.l337.org/l337-apt.gpg - curl" \
+                   "exited $key_status; read the curl message above before concluding." \
+                   "An HTTP error means the key may be missing or moved; a connection or" \
+                   "timeout failure means the channel was not reached." >&2
               exit 1
             fi
             echo "deb [signed-by=/usr/share/keyrings/l337-apt.gpg] https://apt.l337.org/ ./" \
@@ -152,20 +141,18 @@ jobs:
             # proved apt fetched and verified this index, and the apt-cache policy check below
             # fails for any package apt did not take from it.
 
-            # Fetched to a file, then parsed from the file, rather than piped straight into
-            # `mapfile` through a process substitution. Bash discards the exit status of a
-            # process substitution and neither `-e` nor `pipefail` reaches inside one, so that way
-            # a curl that could not connect produced an empty list and this job reported that the
-            # channel advertises no packages at all - blaming the channel for a fetch that never
-            # happened, and sending whoever read it looking for a publishing bug that was not
-            # there. Keep the two findings distinct: unreachable is not empty, and only one of
-            # them is ours.
-            if ! fetch_from_channel https://apt.l337.org/Packages /tmp/Packages; then
+            # Fetched to a file and parsed from the file: bash discards the exit status of a
+            # process substitution and neither `-e` nor `pipefail` reaches inside one, so
+            # `mapfile < <(curl ...)` reported a failed fetch as a channel with no packages.
+            index_status=0
+            fetch_from_channel https://apt.l337.org/Packages /tmp/Packages || index_status=$?
+            if [ "$index_status" -ne 0 ]; then
               echo "::error::Could not fetch the channel index from" \
-                   "https://apt.l337.org/Packages after three attempts. The channel was" \
-                   "unreachable from this runner, which is NOT the same as the channel being" \
-                   "empty or mis-published: check it is being served before reading this as a" \
-                   "publishing failure." >&2
+                   "https://apt.l337.org/Packages - curl" \
+                   "exited $index_status; read the curl message above before concluding." \
+                   "An HTTP error means the index may be missing or mis-published; a" \
+                   "connection or timeout failure means the channel was not reached and says" \
+                   "nothing about what it holds. Neither is the empty-channel error below." >&2
               exit 1
             fi
 
