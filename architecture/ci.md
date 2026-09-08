@@ -135,7 +135,7 @@ Three deliberate decisions, recorded so they are not re-litigated:
   Considered and rejected as unnecessary, not overlooked.
 
 Two known limitations: the setup commands duplicate the two lines in `README.md` and can drift
-from them; and the package list is fetched from the published index over HTTP rather than read
+from them; and the package list is fetched from the published index over HTTPS rather than read
 back out of apt's own lists, so it covers future producers automatically but says nothing about a
 producer whose packages never reached the index at all.
 

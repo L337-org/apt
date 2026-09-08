@@ -77,8 +77,16 @@ jobs:
             #
             # -S --no-progress-meter rather than -s, which would mute the per-attempt retry
             # warnings - the only record that a fetch was flaky rather than clean.
+            #
+            # --proto and --proto-redir pin both the request and any redirect to https, because -L
+            # would otherwise let a misconfigured redirect downgrade these fetches to plaintext.
+            #
+            # The budget allows all three attempts: --max-time caps each at 30s and
+            # --retry-max-time gates only whether a NEW retry may start, so the three start at
+            # 0, 35 and 70 seconds and the last one is inside the 90s gate.
             fetch_from_channel() {
               curl -fSL --no-progress-meter --max-time 30 \
+                   --proto "=https" --proto-redir "=https" \
                    --retry 2 --retry-connrefused --retry-delay 5 --retry-max-time 90 \
                    "$1" -o "$2"
             }
