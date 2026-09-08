@@ -135,6 +135,17 @@ Three deliberate decisions, recorded so they are not re-litigated:
   Considered and rejected as unnecessary, not overlooked.
 
 Two known limitations: the setup commands duplicate the two lines in `README.md` and can drift
-from them; and the package list comes from what apt parsed out of the index, so it covers future
-producers automatically but says nothing about a producer whose packages never reached the index
-at all.
+from them; and the package list is fetched from the published index over HTTPS rather than read
+back out of apt's own lists, so it covers future producers automatically but says nothing about a
+producer whose packages never reached the index at all.
+
+Both fetches from the channel, the signing key and the index, go through one helper that uses
+curl's own retry (`--retry 2 --retry-connrefused`). Do not change it to `--retry-all-errors`: that
+retries a 404, and a missing index must fail at once rather than a minute later. A resolver
+failure is consequently not retried, which is accepted. Keep `-S --no-progress-meter` rather than
+`-s`, or the per-attempt retry warnings vanish. Retry the transport only - every check after a
+successful fetch is about what the channel served.
+
+Failure to reach the channel, an HTTP error from it, and an index that parses to no packages are
+three separate messages. They were once one, so a run that could not connect reported the channel
+as advertising no packages.
