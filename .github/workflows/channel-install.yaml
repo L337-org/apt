@@ -64,7 +64,47 @@ jobs:
             apt-get update -qq
             apt-get install -y -qq curl ca-certificates gnupg >/dev/null
 
-            curl -fsSL https://apt.l337.org/l337-apt.gpg -o /usr/share/keyrings/l337-apt.gpg
+            # Every fetch from the channel goes through here. A single refused connection is not
+            # a finding: the runner egress and the published channel are both remote, both are
+            # occasionally unreachable for a few seconds, and a check that fails the whole run on
+            # one of those reports a blip as a broken channel - which is worse than useless,
+            # because it trains whoever reads it to ignore the alert. Three attempts with a short
+            # backoff, each logged, failing only when all three fail: a real outage still fails
+            # the run, a blip costs three lines in the log. The transport is what is being
+            # tolerated, so the retry wraps the fetch and nothing further - every check after a
+            # successful fetch is about what the channel served, and retrying those would hide
+            # exactly the faults this job exists to catch.
+            #
+            # Written with explicit `if` blocks rather than `&&` lists: under `set -e` a failing
+            # test as the last command of an `&&` list terminates the script, which would turn
+            # "attempt 1 of 3 failed" into an immediate exit and silently undo the retry.
+            fetch_from_channel() {
+              url="$1"
+              dest="$2"
+              attempt=1
+              while :; do
+                status=0
+                curl -fsSL --max-time 30 "$url" -o "$dest" || status=$?
+                if [ "$status" -eq 0 ]; then
+                  return 0
+                fi
+                echo "attempt $attempt of 3 fetching $url failed: curl exited $status" >&2
+                if [ "$attempt" -ge 3 ]; then
+                  return "$status"
+                fi
+                attempt=$((attempt + 1))
+                sleep $((attempt * 5))
+              done
+            }
+
+            if ! fetch_from_channel https://apt.l337.org/l337-apt.gpg /usr/share/keyrings/l337-apt.gpg; then
+              echo "::error::Could not fetch the channel signing key from" \
+                   "https://apt.l337.org/l337-apt.gpg after three attempts. The channel was" \
+                   "unreachable from this runner, which is NOT the same as the key being wrong or" \
+                   "unpublished: check the channel is being served before reading this as a" \
+                   "publishing failure." >&2
+              exit 1
+            fi
             echo "deb [signed-by=/usr/share/keyrings/l337-apt.gpg] https://apt.l337.org/ ./" \
                 > /etc/apt/sources.list.d/l337-apt.list
 
@@ -111,11 +151,28 @@ jobs:
             # Nothing is lost by not reading the copy apt keeps: the apt-get update above already
             # proved apt fetched and verified this index, and the apt-cache policy check below
             # fails for any package apt did not take from it.
-            mapfile -t packages < <(
-              curl -fsSL https://apt.l337.org/Packages | awk "/^Package: /{print \$2}" | sort -u
-            )
+
+            # Fetched to a file, then parsed from the file, rather than piped straight into
+            # `mapfile` through a process substitution. Bash discards the exit status of a
+            # process substitution and neither `-e` nor `pipefail` reaches inside one, so that way
+            # a curl that could not connect produced an empty list and this job reported that the
+            # channel advertises no packages at all - blaming the channel for a fetch that never
+            # happened, and sending whoever read it looking for a publishing bug that was not
+            # there. Keep the two findings distinct: unreachable is not empty, and only one of
+            # them is ours.
+            if ! fetch_from_channel https://apt.l337.org/Packages /tmp/Packages; then
+              echo "::error::Could not fetch the channel index from" \
+                   "https://apt.l337.org/Packages after three attempts. The channel was" \
+                   "unreachable from this runner, which is NOT the same as the channel being" \
+                   "empty or mis-published: check it is being served before reading this as a" \
+                   "publishing failure." >&2
+              exit 1
+            fi
+
+            mapfile -t packages < <(awk "/^Package: /{print \$2}" /tmp/Packages | sort -u)
             if [ "${#packages[@]}" -eq 0 ]; then
-              echo "::error::The channel advertises no packages at all." >&2
+              echo "::error::The channel index was fetched successfully but advertises no" \
+                   "packages at all." >&2
               exit 1
             fi
             echo "Channel advertises ${#packages[@]} package(s): ${packages[*]}"

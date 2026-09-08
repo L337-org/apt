@@ -135,6 +135,22 @@ Three deliberate decisions, recorded so they are not re-litigated:
   Considered and rejected as unnecessary, not overlooked.
 
 Two known limitations: the setup commands duplicate the two lines in `README.md` and can drift
-from them; and the package list comes from what apt parsed out of the index, so it covers future
-producers automatically but says nothing about a producer whose packages never reached the index
-at all.
+from them; and the package list is fetched from the published index over HTTP rather than read
+back out of apt's own lists, so it covers future producers automatically but says nothing about a
+producer whose packages never reached the index at all.
+
+Both fetches from the channel - the signing key and the index - go through one helper that
+retries three times with a short backoff and fails only when all three attempts fail. A single
+refused connection is not a finding: the runner egress and the published channel are both remote
+and both occasionally unreachable for a few seconds, and failing the run on one of those reports
+a blip as a broken channel, which trains whoever reads it to ignore the alert. Only the transport
+is retried; every check after a successful fetch is about what the channel served, and retrying
+those would hide the faults this job exists to catch. `apt-get update` is deliberately not
+wrapped - both observed failures were at the `curl` stage, and apt has its own retry
+configuration that has not been tested here.
+
+A failure to reach the channel is also reported as a different finding from an index that parses
+to no packages: the two send whoever reads the log to different places, one to whether the
+channel is being served at all and the other to what was published. They were once the same
+message, so a run that could not connect said the channel advertised no packages, on days when
+it was serving them perfectly well.
