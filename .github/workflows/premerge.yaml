@@ -91,12 +91,8 @@ jobs:
 
 
   repo-hygiene:
-    # Conventions every repository in this organisation shares, checked by a script that is
-    # byte-identical in each of them and verifies itself against a recorded digest. Editing one
-    # copy fails this job; divergence between copies is watched separately, on a schedule,
-    # because nothing inside one repository could ever see the others.
-    #
-    # Needs no project install: the script carries its own PEP 723 dependency header.
+    # Conventions every repository in this organisation shares, checked by the one copy in the
+    # shared workflows repository at the commit pinned here.
     runs-on: [ubuntu-latest]
     name: Repository hygiene
     # 3s observed - a git listing, a YAML parse of the workflows, and some regexes.
@@ -105,14 +101,16 @@ jobs:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-
       - name: Repository conventions hold
-        run: uv run --script scripts/check-repo-hygiene.py
+        uses: L337-org/github-workflows/actions/repo-hygiene@eacd1a299ea09599157cb40a8909aed47c050b3a # v1.1.0
+
   action-pins:
     name: Action pins are immutable
     runs-on: ubuntu-latest
+    # Every `uses:` names a full commit SHA, checked by the shared copy pinned here.  It matters
+    # more than usual in this repository: the aggregate workflow imports both the APT signing key
+    # and the commit signing key, so a repointed tag on any action it runs could reach them.
+    #
     # 15 minutes against a job that normally finishes in under 40 seconds: enough
     # headroom that it cannot fire on a slow-but-working run, while bounding a hung run
     # to 15 minutes rather than the 6 hours it would otherwise sit for. Note that this
@@ -130,32 +128,8 @@ jobs:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Every third-party `uses:` must name a 40-hex commit SHA
-        run: |
-          # A tag or branch ref can be repointed by the action's owner at any time, and
-          # the aggregate workflow imports both the APT signing key and the commit
-          # signing key - so every third-party action is pinned to an immutable commit.
-          # Dependabot bumps the SHA and rewrites the trailing "# vX.Y.Z" comment, so
-          # pinning does not mean going stale. Local actions (./...) are exempt.
-          #
-          # Quoting is optional in YAML, so `uses: "owner/action@<sha>"` is exactly as
-          # pinned as the bare form, and hex is case-insensitive, so an uppercase SHA is
-          # equally pinned - GitHub resolves one (verified: both the commits and tarball
-          # API endpoints answer 200 for an upper-cased SHA). All are accepted: a guard
-          # that fails a legitimately pinned action is one someone eventually switches
-          # off wholesale, which costs more than it ever caught. In practice every pin
-          # here is lowercase, because that is what Dependabot writes - the point is that
-          # the guard must not punish one that is not.
-          bad=$(grep -rnE '^[[:space:]]*(-[[:space:]]+)?uses:' .github/workflows .github/actions 2>/dev/null \
-                | grep -vE "uses:[[:space:]]*[\"']?\./" \
-                | grep -vE "uses:[[:space:]]*[\"']?[^[:space:]\"']+@[0-9a-fA-F]{40}[\"']?([[:space:]]|\$)" \
-                || true)
-          if [ -n "$bad" ]; then
-            echo "::error::Every third-party action must be pinned to a full 40-hex commit SHA." >&2
-            printf '%s\n' "$bad" >&2
-            exit 1
-          fi
-          echo "All action references are pinned to commit SHAs."
+      - name: Every `uses:` must name a 40-hex commit SHA
+        uses: L337-org/github-workflows/actions/action-pins@eacd1a299ea09599157cb40a8909aed47c050b3a # v1.1.0
 
 
   change-detection:

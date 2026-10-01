@@ -61,18 +61,21 @@ Before this workflow existed, `aggregate.yaml` ran only on schedule/dispatch, so
 publishing would only surface on the next hourly run against the real `gh-pages`. Six jobs, all
 required status checks on `main`'s ruleset:
 
-- **`action-pins`**: greps every `uses:` in `.github/workflows` and `.github/actions` and fails
-  unless it names a 40-hex commit SHA. This workflow imports both signing keys, so a mutable
-  tag/branch ref on a third-party action is a real supply-chain risk here, not a style nit; local
-  actions (`./...`) are exempt, and Dependabot bumps the SHA (rewriting the trailing `# vX.Y.Z`
-  comment) so pinning doesn't mean going stale.
-- **`repo-hygiene`**: runs `scripts/check-repo-hygiene.py`, vendored byte-identically into every
-  repository in the organisation and checking what they all share - no tracker keys or internal
-  Atlassian links in a public repository, every CI job declaring a timeout **and** that timeout
-  being a usable bound, and the instruction layer routing to its detail files in both directions.
-  The timeout half used to live inside `action-pins` here; keeping both would be two guards
-  checking one thing and drifting the first time either was edited, which is the divergence this
-  vendoring exists to avoid. Without a timeout a job inherits GitHub's **6-hour**
+- **`action-pins`**: runs the shared action-pins check from `L337-org/github-workflows`, pinned
+  by commit SHA in the step's `uses:`, over its default directories, which are the ones this
+  repository's own inline copy used to search. What it accepts is described in that repository's
+  README at the pinned commit rather than here, where it would drift. The aggregate workflow
+  imports both signing keys, so a mutable tag/branch ref on an action is a real supply-chain risk
+  here, not a style nit; Dependabot bumps the SHA (rewriting the trailing `# vX.Y.Z` comment) so
+  pinning doesn't mean going stale.
+- **`repo-hygiene`**: runs the shared hygiene check from `L337-org/github-workflows`, pinned by
+  commit SHA in the step's `uses:`, so every repository in the organisation runs one copy of the
+  conventions they share rather than each carrying its own. What it checks, and how to run it
+  locally at the pinned commit, is in that repository's README. One of those conventions, every CI
+  job declaring a usable timeout, has history specific to this repository. The timeout half used
+  to live inside `action-pins` here; keeping both would be two guards checking one thing and
+  drifting the first time either was edited, which is the divergence a single shared copy exists
+  to avoid. Without a timeout a job inherits GitHub's **6-hour**
   default. That is not theoretical: a hang in `Install apt repo tooling` stalled the hourly
   publisher for six hours and, because `cancel-in-progress: false` keeps one pending run per
   group, silently **cancelled every run queued behind it** while reporting nothing, since a stall
@@ -107,6 +110,17 @@ The dry run deliberately stops short of signing and pushing: it calls the same `
 publishing run calls (so it can't drift from what actually ships), but is **never given the signing
 secrets**, so it cannot touch `gh-pages` even by mistake - the job's `permissions: contents: read`
 at the workflow level backs that up structurally, not just by omission of secrets.
+
+### `.github/workflows/code-review.yaml` - the Claude review
+
+Calls the shared review workflow in `L337-org/github-workflows`, pinned to a commit. What it does
+is in that repository's README at the pinned commit and is not restated here, because it changes
+there. When and for whom this repository asks for a review is in the header of `code-review.yaml`.
+
+**The review is advisory.** It is not a required check and does not approve the pull request,
+which is a deliberate exception to the premerge jobs all being required status checks. The calling
+job has no `timeout-minutes` because GitHub forbids one on a reusable-workflow call; the shared
+workflow's own jobs carry the bound, and the hygiene check reports that call as not checked.
 
 ### `.github/workflows/channel-install.yaml` - does the published channel actually install?
 

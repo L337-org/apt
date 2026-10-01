@@ -80,10 +80,9 @@ preinstalled on the runner image and so is not pinned.
 **Docstrings are Google style** - `Args:` and `Returns:` sections, capitalised, with the type in
 the entry because this code carries no annotations. `ruff`'s pydocstyle rules enforce it.
 
-`scripts/check-repo-hygiene.py` is held to those rules too, but not to the type-in-the-entry
-part: it is vendored byte-identically into four repositories whose local conventions differ, so
-it carries what all four can agree on. A change to it lands in all four at once with the shared
-digest regenerated, or its own self-check refuses to run.
+The repository-hygiene and action-pins checks do not live here: `premerge.yaml` runs the shared
+copies from `L337-org/github-workflows`, pinned by commit SHA. That repository's README says what
+they check and how to run the hygiene check locally at the pinned commit.
 
 **`sync-debs.py` will not follow a download URL that is not an https github.com one**, because
 that URL arrives in an API response body rather than from configuration here. `--allow-file-urls`
