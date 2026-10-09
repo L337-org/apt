@@ -27,6 +27,9 @@ version apt actually installs is the version the index advertised, which is what
 channel serving something other than what it claims. Upgrade testing lives with each package's
 own repository rather than here, since upgrading exercises that package's maintainer scripts.
 
+A failed run of either workflow, or of the checks on a push to `main`, is posted to the
+organisation's Slack channel by `.github/workflows/report-failures.yaml`.
+
 ## Onboarding a new project
 
 1. Make the project's release workflow attach its `.deb` to the GitHub Release.

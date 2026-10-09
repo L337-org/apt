@@ -51,8 +51,9 @@ consecutive hourly runs failed unnoticed during a GitHub incident. Rejected beca
 worth as much as its visibility, and the maintainer does not routinely watch **this** repo's issues,
 whereas GitHub's own workflow-failure notification does reach them - so filing one would be strictly
 less visible than the alert that already exists, while adding `issues: write` to a workflow that
-holds both signing keys. If a louder channel is ever wanted, the place to look is the existing daily
-channel check, which already posts to Slack.
+holds both signing keys. The louder channel is Slack: `report-failures.yaml` posts a failed run,
+below, from a separate workflow that holds neither key.  A persistent failure is posted once per
+hourly run until it is fixed.
 
 ### `.github/workflows/premerge.yaml` - the PR gate
 
@@ -145,8 +146,9 @@ Three deliberate decisions, recorded so they are not re-litigated:
   repos do not control.
 - **Upgrade testing is deliberately NOT here.** Upgrading from the previous release exercises a
   package's own maintainer scripts, which belong with the code that produces them.
-- **No issue is filed on failure.** GitHub's own workflow-failure notification is the alert.
-  Considered and rejected as unnecessary, not overlooked.
+- **No issue is filed on failure.** GitHub's own workflow-failure notification and the Slack
+  post from `report-failures.yaml` are the alerts.  Considered and rejected as unnecessary, not
+  overlooked.
 
 Two known limitations: the setup commands duplicate the two lines in `README.md` and can drift
 from them; and the package list is fetched from the published index over HTTPS rather than read
@@ -163,3 +165,25 @@ successful fetch is about what the channel served.
 Failure to reach the channel, an HTTP error from it, and an index that parses to no packages are
 three separate messages. They were once one, so a run that could not connect reported the channel
 as advertising no packages.
+
+### `.github/workflows/report-failures.yaml` - failed unattended runs reach Slack
+
+A watcher for the shared Slack reporter in `L337-org/github-workflows`, pinned to a commit; what
+the reporter posts and when is in that repository's README at the pinned commit.  `workflow_run`
+starts it when a workflow in its `workflows:` list completes, and the reporter posts any run of
+those started by a schedule, a push to `main` or a release that did not succeed, cancelled runs
+included.  A pull request's run and a manual run are not posted: someone is watching each.
+
+- **Adding a workflow.**  Give it a `name:` and add that name to `workflows:`, exactly as
+  written, since GitHub matches on it.  The shared hygiene check fails on a scheduled, push or
+  release workflow missing from the list, and on a listed name no workflow has, so a rename that
+  leaves the list behind fails `repo-hygiene`.
+- **Where it posts.**  To the webhook in the `SLACK_WEBHOOK` secret.  This repository has none
+  of its own, so the organisation's secret applies and the post goes to the organisation's
+  channel; a repository secret of the same name would take precedence.
+- **A post that fails, fails the *Report failures* run**, with Slack's answer in its log.
+- **It holds no signing key** and needs only `actions: read` and `contents: read`, which is
+  why the post is a separate workflow rather than a step in `aggregate.yaml`.
+- GitHub reads `workflow_run` only from the default branch, so a change here is tested only once
+  merged.
+
