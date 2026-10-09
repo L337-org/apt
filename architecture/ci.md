@@ -165,14 +165,15 @@ Failure to reach the channel, an HTTP error from it, and an index that parses to
 three separate messages. They were once one, so a run that could not connect reported the channel
 as advertising no packages.
 
-### `.github/workflows/report-failures.yaml` - failed unattended runs reach Slack
+### `.github/workflows/report-failures.yaml` - failed runs reach Slack
 
 A watcher for the shared Slack reporter in `L337-org/github-workflows`, pinned to a commit.
 `workflow_run` starts it when a workflow in its `workflows:` list completes, and it asks the
-reporter for runs started by a schedule, a push or a release.  A pull request's run and a manual
-run are left out on purpose: someone is watching each.  Which of those runs are posted, and what
-happens when a post fails, is in that repository's README at the pinned commit; it is not
-restated here because it would drift.
+reporter for runs started by a schedule, a push, a release or a pull request.  A failing pull
+request run is rare and its page easy to miss, so it is posted too.  A manual run is left out on
+purpose: whoever started it is watching.  Which of those runs are posted, and what happens
+when a post fails, is in that repository's README at the pinned commit; it is not restated here
+because it would drift.
 
 - **Adding a workflow.**  Give it a `name:` and add that name to `workflows:`, exactly as
   written, since GitHub matches on it.  The shared hygiene check enforces the list, so a rename
