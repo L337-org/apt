@@ -1,9 +1,9 @@
 name: 'Report failures'
 
 # Posts a failed run of a workflow named below, started by one of the events below, to Slack,
-# through the shared reporter pinned here (architecture/ci.md).  This repository has no
-# SLACK_WEBHOOK secret of its own, so the organisation's applies and the post goes to the
-# organisation's channel.  GitHub reads this trigger only from the default branch.
+# through the shared reporter pinned here (architecture/ci.md).  It posts to the channel of the
+# webhook in the SLACK_WEBHOOK secret; a repository secret of that name overrides an
+# organisation one.  GitHub reads this trigger only from the default branch.
 on:
   workflow_run:
     workflows:
