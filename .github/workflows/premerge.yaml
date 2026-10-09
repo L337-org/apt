@@ -122,8 +122,8 @@ jobs:
     # are attached to a PR, where any non-green result blocks the merge in front of a
     # human. It is also why this workflow gets no cancelled-to-failure guard job -
     # `cancel-in-progress: true` above makes a superseded run cancel routinely, so such
-    # a guard would cry wolf on every re-push. The scheduled workflows, which nobody is
-    # watching, do carry one.
+    # a guard would cry wolf on every re-push. The scheduled workflows, whose runs nobody
+    # starts, do carry one.
     timeout-minutes: 15
     steps:
       - name: Check out source repository
@@ -146,8 +146,8 @@ jobs:
     # are attached to a PR, where any non-green result blocks the merge in front of a
     # human. It is also why this workflow gets no cancelled-to-failure guard job -
     # `cancel-in-progress: true` above makes a superseded run cancel routinely, so such
-    # a guard would cry wolf on every re-push. The scheduled workflows, which nobody is
-    # watching, do carry one.
+    # a guard would cry wolf on every re-push. The scheduled workflows, whose runs nobody
+    # starts, do carry one.
     timeout-minutes: 15
     steps:
       - name: Check out source repository
@@ -174,8 +174,8 @@ jobs:
     # are attached to a PR, where any non-green result blocks the merge in front of a
     # human. It is also why this workflow gets no cancelled-to-failure guard job -
     # `cancel-in-progress: true` above makes a superseded run cancel routinely, so such
-    # a guard would cry wolf on every re-push. The scheduled workflows, which nobody is
-    # watching, do carry one.
+    # a guard would cry wolf on every re-push. The scheduled workflows, whose runs nobody
+    # starts, do carry one.
     timeout-minutes: 15
     steps:
       - name: Check out source repository
@@ -202,8 +202,8 @@ jobs:
     # are attached to a PR, where any non-green result blocks the merge in front of a
     # human. It is also why this workflow gets no cancelled-to-failure guard job -
     # `cancel-in-progress: true` above makes a superseded run cancel routinely, so such
-    # a guard would cry wolf on every re-push. The scheduled workflows, which nobody is
-    # watching, do carry one.
+    # a guard would cry wolf on every re-push. The scheduled workflows, whose runs nobody
+    # starts, do carry one.
     timeout-minutes: 15
     steps:
       - name: Check out source repository
@@ -236,8 +236,8 @@ jobs:
     # are attached to a PR, where any non-green result blocks the merge in front of a
     # human. It is also why this workflow gets no cancelled-to-failure guard job -
     # `cancel-in-progress: true` above makes a superseded run cancel routinely, so such
-    # a guard would cry wolf on every re-push. The scheduled workflows, which nobody is
-    # watching, do carry one.
+    # a guard would cry wolf on every re-push. The scheduled workflows, whose runs nobody
+    # starts, do carry one.
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
