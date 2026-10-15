@@ -106,18 +106,15 @@ jobs:
         uses: L337-org/github-workflows/actions/repo-hygiene@v2
 
   action-pins:
-    # The name stays although the shared check also accepts the shared workflows' major-version
-    # tag: it is a required check on `main`'s ruleset, and a new name would need the ruleset
-    # changing with it.
-    name: Action pins are immutable
+    name: Action pin check
     runs-on: ubuntu-latest
     # Every third-party `uses:` names a full commit SHA, and the shared workflows repository's
     # own actions and workflows its major-version tag, checked by the shared copy named here.  It
     # matters more than usual in this repository: the aggregate workflow imports both the APT
     # signing key and the commit signing key, so a repointed tag on any action it runs could reach
     # them.  That is why the second check holds aggregate.yaml to a stricter rule than the shared
-    # one: commit SHAs only, and nothing from the shared workflows repository at all.  It runs in
-    # this job, rather than its own, for the same reason the name stays.
+    # one: commit SHAs only, and nothing from the shared workflows repository at all.  It is a
+    # rule about what an action reference may name, so it belongs with the pin check.
     #
     # 15 minutes against a job that normally finishes in under 40 seconds: enough
     # headroom that it cannot fire on a slow-but-working run, while bounding a hung run
