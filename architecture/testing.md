@@ -56,11 +56,5 @@ fails if it's widened. Verified by mutation: removing the Release comparison fai
 
 ### `scripts/test-check-aggregate-pins.sh`
 
-Writes fixture workflows and runs `check-aggregate-pins.sh` over each, so the guard keeping the
-signing keys out of a moved shared tag's reach is shown to refuse, not only to pass.  Accepted: a
-40-hex SHA, quoted or with a version comment, and a local `./` path.  Refused: the shared workflows
-repository at a tag and at a SHA, in either case, a third-party tag, a branch, a short SHA, one bad
-reference beside a good one, and a workflow with no `uses:` at all, which must not read as a pass.
-Needs only bash and standard command-line tools.  Run by the `action-pins` premerge job, after the
-check itself.  Verified by mutation: adding the shared hygiene action at `@v2` to `aggregate.yaml`,
-or turning its checkout pin into `@v7`, fails the check on that line.
+Runs `check-aggregate-pins.sh` over fixture workflows, so the guard is shown to refuse as well as
+pass; the cases are in the script.  Run by the `action-pins` premerge job.

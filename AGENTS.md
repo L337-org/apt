@@ -64,13 +64,8 @@ at all.
   and python3 with PyYAML for `test-sync-debs.sh`, so they run on a developer machine unchanged.
 - Every third-party GitHub Action `uses:` must be pinned to a 40-hex commit SHA (`action-pins`
   job enforces it); Dependabot (`.github/dependabot.yml`, weekly, grouped into one PR) bumps the
-  SHA and its trailing `# vX.Y.Z` comment.  `L337-org/github-workflows` is the exception: it is
-  referenced at its major-version tag, so its changes arrive without a pull request here.  The
-  exception holds only while that repository protects the tag; what a moved tag would reach here
-  is in `architecture/ci.md`.
-- `aggregate.yaml` holds both signing keys, so it takes nothing from `L337-org/github-workflows`
-  and nothing at a tag or branch: every `uses:` in it is a 40-hex SHA or a local `./` path.
-  `scripts/check-aggregate-pins.sh` fails the required `action-pins` job otherwise.
+  SHA and its trailing `# vX.Y.Z` comment.  `L337-org/github-workflows` is the exception, at its
+  major-version tag, except in `aggregate.yaml` (`architecture/ci.md`).
 - Bash scripts run under `set -euo pipefail`; comments in the workflows and scripts carry the
   *why* for non-obvious steps (change-detection edge cases, key isolation, reproducibility
   quirks) — read them before changing behaviour, and extend them rather than paraphrasing when

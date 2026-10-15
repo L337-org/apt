@@ -68,7 +68,7 @@ required status checks on `main`'s ruleset:
   keys, so a mutable tag/branch ref on a third-party action is a real supply-chain risk here, not
   a style nit; Dependabot bumps the SHA (rewriting the trailing `# vX.Y.Z` comment) so pinning
   doesn't mean going stale. `L337-org/github-workflows` itself is referenced at its major-version
-  tag; see "What the shared tag reaches" below.
+  tag, everywhere but `aggregate.yaml` (below).
 - **`repo-hygiene`**: runs the shared hygiene check from `L337-org/github-workflows`, at the
   major-version tag in the step's `uses:`, so every repository in the organisation runs one copy
   of the conventions they share rather than each carrying its own. What it checks, and how to run
@@ -189,36 +189,11 @@ restated here because it would drift.
 
 ### `.github/workflows/announce-pull-requests.yaml` - pull requests reach Slack
 
-Calls the shared announcer in `L337-org/github-workflows`, at its major-version tag, when a pull
-request is opened, reopened or marked ready for review, and posts to the channel named in its
-`channel:` through the bot token in `SLACK_BOT_TOKEN`.  Which of those pull requests it posts,
-and why, is decided there and described in that repository's README.  A run Dependabot starts
-sees only Dependabot secrets, so `SLACK_BOT_TOKEN` must also be set as a Dependabot secret for
-its pull requests to be announced.
+Calls the shared announcer, which the github-workflows README describes.  `SLACK_BOT_TOKEN` must
+also be a Dependabot secret, or Dependabot's pull requests are not announced.
 
-- **It holds no key** and is given no permissions.
-- **Its failures are reported** like any other pull request run's, through
-  `report-failures.yaml`, which lists it.
+### `aggregate.yaml` takes only commit SHAs
 
-### What the shared tag reaches
-
-Every call to `L337-org/github-workflows` names its major-version tag rather than a commit, so a
-change released there runs here without a pull request here.  That rests on one condition: the
-tag is protected in that repository so that moving it takes no fewer rights than merging to its
-`main`.  If that protection is loosened, the exception no longer holds and these calls should go
-back to commits.
-
-What someone who moved the tag could reach here:
-
-- **`code-review.yaml`**: `CLAUDE_CODE_OAUTH_TOKEN`, and a token with `pull-requests: write`.
-- **`report-failures.yaml` and `announce-pull-requests.yaml`**: `SLACK_BOT_TOKEN`.
-- **`premerge.yaml`**: the logic of two required checks, `repo-hygiene` and `action-pins`,
-  including what `action-pins` accepts in every workflow here.
-
-**`aggregate.yaml` takes nothing from `L337-org/github-workflows`, and nothing at a tag or branch
-from anyone: every `uses:` in it is a 40-hex commit SHA or a local `./` path.**  It imports the APT
-signing key and the commit signing key, and a moved shared tag must not be able to reach them.
-`scripts/check-aggregate-pins.sh` enforces it in the required `action-pins` job, and
-`scripts/test-check-aggregate-pins.sh`, run in the same job, shows the check refuses a shared
-action, a tag, a branch and a short SHA.  To call something new from `aggregate.yaml`, pin it to a
-commit; to need the shared repository there, change this rule first.
+**Every `uses:` in `aggregate.yaml` is a 40-hex commit SHA or a local `./` path, and none is from
+`L337-org/github-workflows`,** because it holds both signing keys and a moved tag must not reach
+them.  `scripts/check-aggregate-pins.sh` enforces this in the `action-pins` job.
