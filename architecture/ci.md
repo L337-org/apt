@@ -203,10 +203,10 @@ its pull requests to be announced.
 ### What the shared tag reaches
 
 Every call to `L337-org/github-workflows` names its major-version tag rather than a commit, so a
-change released there runs here without a pull request here.  That is a deliberate trade, made
-by the owner in the organisation's policy, and it rests on one condition: the tag is protected
-in that repository so that moving it takes no fewer rights than merging to its `main`.  If that
-protection is loosened, the exception no longer holds and these calls should go back to commits.
+change released there runs here without a pull request here.  That rests on one condition: the
+tag is protected in that repository so that moving it takes no fewer rights than merging to its
+`main`.  If that protection is loosened, the exception no longer holds and these calls should go
+back to commits.
 
 What someone who moved the tag could reach here:
 
@@ -215,6 +215,10 @@ What someone who moved the tag could reach here:
 - **`premerge.yaml`**: the logic of two required checks, `repo-hygiene` and `action-pins`,
   including what `action-pins` accepts in every workflow here.
 
-`aggregate.yaml`, which imports the APT signing key and the commit signing key, uses nothing from
-`L337-org/github-workflows` today, so a moved tag does not reach either key.
-
+**`aggregate.yaml` takes nothing from `L337-org/github-workflows`, and nothing at a tag or branch
+from anyone: every `uses:` in it is a 40-hex commit SHA or a local `./` path.**  It imports the APT
+signing key and the commit signing key, and a moved shared tag must not be able to reach them.
+`scripts/check-aggregate-pins.sh` enforces it in the required `action-pins` job, and
+`scripts/test-check-aggregate-pins.sh`, run in the same job, shows the check refuses a shared
+action, a tag, a branch and a short SHA.  To call something new from `aggregate.yaml`, pin it to a
+commit; to need the shared repository there, change this rule first.

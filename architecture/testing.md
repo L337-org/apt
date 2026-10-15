@@ -53,3 +53,14 @@ be ignored, a real checksum entry changing and a self-entry disappearing must pu
 the two filters in `release_signal()` has a test that fails if it's dropped **and** a test that
 fails if it's widened. Verified by mutation: removing the Release comparison fails exactly the two
 "must publish" cases, and dropping the `Packages.gz` filter fails exactly the `Packages.gz` one.
+
+### `scripts/test-check-aggregate-pins.sh`
+
+Writes fixture workflows and runs `check-aggregate-pins.sh` over each, so the guard keeping the
+signing keys out of a moved shared tag's reach is shown to refuse, not only to pass.  Accepted: a
+40-hex SHA, quoted or with a version comment, and a local `./` path.  Refused: the shared
+workflows repository at a tag and at a SHA, in either case, a third-party tag, a branch, a short
+SHA, one bad reference beside a good one, and a workflow with no `uses:` at all, which must not
+read as a pass.  Needs only bash and grep.  Run by the `action-pins` premerge job, after the
+check itself.  Verified by mutation: adding the shared hygiene action at `@v2` to
+`aggregate.yaml`, or turning its checkout pin into `@v7`, fails the check on that line.
