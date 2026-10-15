@@ -1,8 +1,8 @@
 name: 'Announce pull requests'
 
-# Posts each pull request that needs action - opened or reopened and not a draft, or marked ready
-# for review - to Slack, through the shared announcer at the version named here
-# (architecture/ci.md).  Forks are not posted; Dependabot's are.
+# Runs the shared announcer, at the version named here, when a pull request is opened, reopened
+# or marked ready for review.  Which of those it posts to Slack is decided there and described
+# in that repository's README (architecture/ci.md).
 on:
   pull_request:
     types: [opened, reopened, ready_for_review]

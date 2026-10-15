@@ -109,10 +109,10 @@ jobs:
     name: Action pins are immutable
     runs-on: ubuntu-latest
     # Every third-party `uses:` names a full commit SHA, and the shared workflows repository's
-    # own actions and workflows its protected major-version tag, checked by the shared copy named
-    # here.  It matters more than usual in this repository: the aggregate workflow imports both
-    # the APT signing key and the commit signing key, so a repointed tag on any action it runs
-    # could reach them.
+    # own actions and workflows its major-version tag, checked by the shared copy named here.  It
+    # matters more than usual in this repository: the aggregate workflow imports both the APT
+    # signing key and the commit signing key, so a repointed tag on any action it runs could reach
+    # them.
     #
     # 15 minutes against a job that normally finishes in under 40 seconds: enough
     # headroom that it cannot fire on a slow-but-working run, while bounding a hung run
@@ -131,7 +131,7 @@ jobs:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Every `uses:` must name a 40-hex commit SHA or a protected version tag
+      - name: Every `uses:` must name a 40-hex SHA, or the shared workflows' major-version tag
         uses: L337-org/github-workflows/actions/action-pins@v2
 
 

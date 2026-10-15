@@ -2,7 +2,7 @@ name: 'Report failures'
 
 # Posts a failed run of a workflow named below, started by one of the events below, to Slack,
 # through the shared reporter at the version named here (architecture/ci.md).  It posts to the
-# channel named below through the organisation's bot token in SLACK_BOT_TOKEN.  GitHub reads
+# channel named below through the bot token in SLACK_BOT_TOKEN.  GitHub reads
 # this trigger only from the default branch.
 on:
   workflow_run:

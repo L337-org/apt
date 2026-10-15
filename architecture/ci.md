@@ -68,7 +68,7 @@ required status checks on `main`'s ruleset:
   keys, so a mutable tag/branch ref on a third-party action is a real supply-chain risk here, not
   a style nit; Dependabot bumps the SHA (rewriting the trailing `# vX.Y.Z` comment) so pinning
   doesn't mean going stale. `L337-org/github-workflows` itself is referenced at its major-version
-  tag, which only the same people who can merge to its `main` can move.
+  tag; see "What the shared tag reaches" below.
 - **`repo-hygiene`**: runs the shared hygiene check from `L337-org/github-workflows`, at the
   major-version tag in the step's `uses:`, so every repository in the organisation runs one copy
   of the conventions they share rather than each carrying its own. What it checks, and how to run
@@ -180,8 +180,8 @@ restated here because it would drift.
 - **Adding a workflow.**  Give it a `name:` and add that name to `workflows:`, exactly as
   written, since GitHub matches on it.  The shared hygiene check enforces the list, so a rename
   that leaves it behind fails `repo-hygiene`.
-- **Where it posts.**  To the channel named in its `channel:`, through the organisation's bot
-  token in the `SLACK_BOT_TOKEN` secret.
+- **Where it posts.**  To the channel named in its `channel:`, through the bot token in
+  `SLACK_BOT_TOKEN`.
 - **It holds no signing key** and needs only `actions: read` and `contents: read`, which is
   why the post is a separate workflow rather than a step in `aggregate.yaml`.
 - GitHub reads `workflow_run` only from the default branch, so a change here is tested only once
@@ -190,12 +190,31 @@ restated here because it would drift.
 ### `.github/workflows/announce-pull-requests.yaml` - pull requests reach Slack
 
 Calls the shared announcer in `L337-org/github-workflows`, at its major-version tag, when a pull
-request is opened, reopened or marked ready for review.  It posts one that needs action to the
-channel named in its `channel:`, through the organisation's bot token in `SLACK_BOT_TOKEN`: not a
-draft, and not one from a fork.  Dependabot's are posted, which is why the token is also a
-Dependabot secret.  What it skips, and why, is in that repository's README.
+request is opened, reopened or marked ready for review, and posts to the channel named in its
+`channel:` through the bot token in `SLACK_BOT_TOKEN`.  Which of those pull requests it posts,
+and why, is decided there and described in that repository's README.  A run Dependabot starts
+sees only Dependabot secrets, so `SLACK_BOT_TOKEN` must also be set as a Dependabot secret for
+its pull requests to be announced.
 
 - **It holds no key** and is given no permissions.
 - **Its failures are reported** like any other pull request run's, through
   `report-failures.yaml`, which lists it.
+
+### What the shared tag reaches
+
+Every call to `L337-org/github-workflows` names its major-version tag rather than a commit, so a
+change released there runs here without a pull request here.  That is a deliberate trade, made
+by the owner in the organisation's policy, and it rests on one condition: the tag is protected
+in that repository so that moving it takes no fewer rights than merging to its `main`.  If that
+protection is loosened, the exception no longer holds and these calls should go back to commits.
+
+What someone who moved the tag could reach here:
+
+- **`code-review.yaml`**: `CLAUDE_CODE_OAUTH_TOKEN`, and a token with `pull-requests: write`.
+- **`report-failures.yaml` and `announce-pull-requests.yaml`**: `SLACK_BOT_TOKEN`.
+- **`premerge.yaml`**: the logic of two required checks, `repo-hygiene` and `action-pins`,
+  including what `action-pins` accepts in every workflow here.
+
+`aggregate.yaml`, which imports the APT signing key and the commit signing key, uses nothing from
+`L337-org/github-workflows` today, so a moved tag does not reach either key.
 
