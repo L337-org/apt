@@ -1,0 +1,19 @@
+name: 'Announce pull requests'
+
+# Posts each pull request that needs action - opened or reopened and not a draft, or marked ready
+# for review - to Slack, through the shared announcer at the version named here
+# (architecture/ci.md).  Forks are not posted; Dependabot's are.
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions: {}
+
+jobs:
+  slack:
+    name: Announce to Slack
+    uses: L337-org/github-workflows/.github/workflows/slack-on-pull-request.yaml@v2
+    with:
+      channel: '#l337-org'
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

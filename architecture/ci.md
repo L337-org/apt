@@ -61,17 +61,18 @@ Before this workflow existed, `aggregate.yaml` ran only on schedule/dispatch, so
 publishing would only surface on the next hourly run against the real `gh-pages`. Six jobs, all
 required status checks on `main`'s ruleset:
 
-- **`action-pins`**: runs the shared action-pins check from `L337-org/github-workflows`, pinned
-  by commit SHA in the step's `uses:`, over its default directories, which are the ones this
+- **`action-pins`**: runs the shared action-pins check from `L337-org/github-workflows`, at the
+  major-version tag in the step's `uses:`, over its default directories, which are the ones this
   repository's own inline copy used to search. What it accepts is described in that repository's
-  README at the pinned commit rather than here, where it would drift. The aggregate workflow
-  imports both signing keys, so a mutable tag/branch ref on an action is a real supply-chain risk
-  here, not a style nit; Dependabot bumps the SHA (rewriting the trailing `# vX.Y.Z` comment) so
-  pinning doesn't mean going stale.
-- **`repo-hygiene`**: runs the shared hygiene check from `L337-org/github-workflows`, pinned by
-  commit SHA in the step's `uses:`, so every repository in the organisation runs one copy of the
-  conventions they share rather than each carrying its own. What it checks, and how to run it
-  locally at the pinned commit, is in that repository's README. One of those conventions, every CI
+  README rather than here, where it would drift. The aggregate workflow imports both signing
+  keys, so a mutable tag/branch ref on a third-party action is a real supply-chain risk here, not
+  a style nit; Dependabot bumps the SHA (rewriting the trailing `# vX.Y.Z` comment) so pinning
+  doesn't mean going stale. `L337-org/github-workflows` itself is referenced at its major-version
+  tag, which only the same people who can merge to its `main` can move.
+- **`repo-hygiene`**: runs the shared hygiene check from `L337-org/github-workflows`, at the
+  major-version tag in the step's `uses:`, so every repository in the organisation runs one copy
+  of the conventions they share rather than each carrying its own. What it checks, and how to run
+  it locally at that version, is in that repository's README. One of those conventions, every CI
   job declaring a usable timeout, has history specific to this repository. The timeout half used
   to live inside `action-pins` here; keeping both would be two guards checking one thing and
   drifting the first time either was edited, which is the divergence a single shared copy exists
@@ -113,9 +114,9 @@ at the workflow level backs that up structurally, not just by omission of secret
 
 ### `.github/workflows/code-review.yaml` - the Claude review
 
-Calls the shared review workflow in `L337-org/github-workflows`, pinned to a commit. What it does
-is in that repository's README at the pinned commit and is not restated here, because it changes
-there. When and for whom this repository asks for a review is in the header of `code-review.yaml`.
+Calls the shared review workflow in `L337-org/github-workflows`, at its major-version tag. What
+it does is in that repository's README and is not restated here, because it changes there. When
+and for whom this repository asks for a review is in the header of `code-review.yaml`.
 
 **The review is advisory.** It is not a required check and does not approve the pull request,
 which is a deliberate exception to the premerge jobs all being required status checks. The calling
@@ -167,21 +168,34 @@ as advertising no packages.
 
 ### `.github/workflows/report-failures.yaml` - failed runs reach Slack
 
-A watcher for the shared Slack reporter in `L337-org/github-workflows`, pinned to a commit.
+A watcher for the shared Slack reporter in `L337-org/github-workflows`, at its major-version
+tag.
 `workflow_run` starts it when a workflow in its `workflows:` list completes, and it asks the
 reporter for runs started by a schedule, a push, a release or a pull request, since a failing
 pull request run's page is easy to miss.  A run started by hand, or a review asked for by
 comment, is left out on purpose: whoever started it is watching.  Which of those runs are
-posted, and what happens when a post fails, is in that repository's README at the pinned
-commit; it is not restated here because it would drift.
+posted, and what happens when a post fails, is in that repository's README; it is not
+restated here because it would drift.
 
 - **Adding a workflow.**  Give it a `name:` and add that name to `workflows:`, exactly as
   written, since GitHub matches on it.  The shared hygiene check enforces the list, so a rename
   that leaves it behind fails `repo-hygiene`.
-- **Where it posts.**  To the channel of the webhook in the `SLACK_WEBHOOK` secret.  A
-  repository secret of that name overrides an organisation one.
+- **Where it posts.**  To the channel named in its `channel:`, through the organisation's bot
+  token in the `SLACK_BOT_TOKEN` secret.
 - **It holds no signing key** and needs only `actions: read` and `contents: read`, which is
   why the post is a separate workflow rather than a step in `aggregate.yaml`.
 - GitHub reads `workflow_run` only from the default branch, so a change here is tested only once
   merged.
+
+### `.github/workflows/announce-pull-requests.yaml` - pull requests reach Slack
+
+Calls the shared announcer in `L337-org/github-workflows`, at its major-version tag, when a pull
+request is opened, reopened or marked ready for review.  It posts one that needs action to the
+channel named in its `channel:`, through the organisation's bot token in `SLACK_BOT_TOKEN`: not a
+draft, and not one from a fork.  Dependabot's are posted, which is why the token is also a
+Dependabot secret.  What it skips, and why, is in that repository's README.
+
+- **It holds no key** and is given no permissions.
+- **Its failures are reported** like any other pull request run's, through
+  `report-failures.yaml`, which lists it.
 
