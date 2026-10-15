@@ -1,0 +1,19 @@
+name: 'Announce pull requests'
+
+# Runs the shared announcer, at the version named here, when a pull request is opened, reopened
+# or marked ready for review.  Which of those it posts to Slack is decided there and described
+# in that repository's README (architecture/ci.md).
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions: {}
+
+jobs:
+  slack:
+    name: Announce to Slack
+    uses: L337-org/github-workflows/.github/workflows/slack-on-pull-request.yaml@v2
+    with:
+      channel: '#l337-org'
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

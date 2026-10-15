@@ -53,3 +53,8 @@ be ignored, a real checksum entry changing and a self-entry disappearing must pu
 the two filters in `release_signal()` has a test that fails if it's dropped **and** a test that
 fails if it's widened. Verified by mutation: removing the Release comparison fails exactly the two
 "must publish" cases, and dropping the `Packages.gz` filter fails exactly the `Packages.gz` one.
+
+### `scripts/test-check-aggregate-pins.sh`
+
+Runs `check-aggregate-pins.sh` over fixture workflows, so the guard is shown to refuse as well as
+pass; the cases are in the script.  Run by the `action-pins` premerge job.

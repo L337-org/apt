@@ -64,7 +64,8 @@ at all.
   and python3 with PyYAML for `test-sync-debs.sh`, so they run on a developer machine unchanged.
 - Every third-party GitHub Action `uses:` must be pinned to a 40-hex commit SHA (`action-pins`
   job enforces it); Dependabot (`.github/dependabot.yml`, weekly, grouped into one PR) bumps the
-  SHA and its trailing `# vX.Y.Z` comment.
+  SHA and its trailing `# vX.Y.Z` comment.  `L337-org/github-workflows` is the exception, at its
+  major-version tag, except in `aggregate.yaml` (`architecture/ci.md`).
 - Bash scripts run under `set -euo pipefail`; comments in the workflows and scripts carry the
   *why* for non-obvious steps (change-detection edge cases, key isolation, reproducibility
   quirks) — read them before changing behaviour, and extend them rather than paraphrasing when
@@ -81,8 +82,8 @@ preinstalled on the runner image and so is not pinned.
 the entry because this code carries no annotations. `ruff`'s pydocstyle rules enforce it.
 
 The repository-hygiene and action-pins checks do not live here: `premerge.yaml` runs the shared
-copies from `L337-org/github-workflows`, pinned by commit SHA. That repository's README says what
-they check and how to run the hygiene check locally at the pinned commit.
+copies from `L337-org/github-workflows`, at its major-version tag. That repository's README says
+what they check and how to run the hygiene check locally at that version.
 
 **`sync-debs.py` will not follow a download URL that is not an https github.com one**, because
 that URL arrives in an API response body rather than from configuration here. `--allow-file-urls`

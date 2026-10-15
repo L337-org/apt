@@ -92,7 +92,7 @@ jobs:
 
   repo-hygiene:
     # Conventions every repository in this organisation shares, checked by the one copy in the
-    # shared workflows repository at the commit pinned here.
+    # shared workflows repository at the version named here.
     runs-on: [ubuntu-latest]
     name: Repository hygiene
     # Seconds: the shared action sets up uv, then runs a git listing, a YAML parse of the
@@ -103,14 +103,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Repository conventions hold
-        uses: L337-org/github-workflows/actions/repo-hygiene@fd692a603b2f6bb8bc73aaeaefa46c24b409705b # v1.3.1
+        uses: L337-org/github-workflows/actions/repo-hygiene@v2
 
   action-pins:
-    name: Action pins are immutable
+    name: Action pin check
     runs-on: ubuntu-latest
-    # Every `uses:` names a full commit SHA, checked by the shared copy pinned here.  It matters
-    # more than usual in this repository: the aggregate workflow imports both the APT signing key
-    # and the commit signing key, so a repointed tag on any action it runs could reach them.
+    # Every third-party `uses:` names a full commit SHA, and the shared workflows repository's
+    # own actions and workflows its major-version tag, checked by the shared copy named here.  It
+    # matters more than usual in this repository: the aggregate workflow imports both the APT
+    # signing key and the commit signing key, so a repointed tag on any action it runs could reach
+    # them.  That is why the second check holds aggregate.yaml to a stricter rule than the shared
+    # one: commit SHAs only, and nothing from the shared workflows repository at all.  It is a
+    # rule about what an action reference may name, so it belongs with the pin check.
     #
     # 15 minutes against a job that normally finishes in under 40 seconds: enough
     # headroom that it cannot fire on a slow-but-working run, while bounding a hung run
@@ -129,8 +133,14 @@ jobs:
       - name: Check out source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Every `uses:` must name a 40-hex commit SHA
-        uses: L337-org/github-workflows/actions/action-pins@fd692a603b2f6bb8bc73aaeaefa46c24b409705b # v1.3.1
+      - name: Every `uses:` must name a 40-hex SHA, or the shared workflows' major-version tag
+        uses: L337-org/github-workflows/actions/action-pins@v2
+
+      - name: The publishing workflow takes only commit SHAs, and nothing from the shared workflows
+        run: scripts/check-aggregate-pins.sh
+
+      - name: That check refuses what it should
+        run: scripts/test-check-aggregate-pins.sh
 
 
   change-detection:
